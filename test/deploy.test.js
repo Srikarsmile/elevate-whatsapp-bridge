@@ -66,6 +66,10 @@ test("systemd pins every bridge state path and defaults callback dispatch to dis
   );
   assert.doesNotMatch(unit, /^Environment=CALLBACK_DISPATCH_MODE=live$/m);
   assert.doesNotMatch(unit, /^Environment=RESUME_PATH=/m);
+  assert.match(
+    unit,
+    /^Environment=REPOSITORY_URL=https:\/\/github\.com\/Srikarsmile\/elevate-whatsapp-bridge$/m
+  );
 });
 
 test("feedback worker runs as a separate hardened identity", async () => {
