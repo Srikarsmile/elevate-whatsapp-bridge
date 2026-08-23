@@ -8,8 +8,14 @@ Type=simple
 User=elevate-wa
 Group=elevate-wa
 WorkingDirectory=/srv/elevate-whatsapp-bridge
+Environment=CALLBACK_DISPATCH_MODE=disabled
 EnvironmentFile=/etc/elevate-whatsapp-bridge.env
 Environment=CALLBACKS_PATH=/var/lib/elevate-whatsapp-bridge/callbacks.json
+Environment=OUTBOUND_EVENTS_PATH=/var/lib/elevate-whatsapp-bridge/outbound-events.json
+Environment=EVALUATION_JOBS_PATH=/var/lib/elevate-whatsapp-bridge/evaluation-jobs.json
+Environment=FEEDBACK_PATH=/var/lib/elevate-whatsapp-bridge/feedback.json
+Environment=EVALUATION_CASES_PATH=/var/lib/elevate-whatsapp-bridge/evaluation-cases.json
+Environment=RECOMMENDATIONS_PATH=/var/lib/elevate-whatsapp-bridge/recommendations.json
 Environment=RESUME_PATH=/var/lib/elevate-whatsapp-bridge/assets/Srikar-Reddy-Software-Engineer-CV.pdf
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure

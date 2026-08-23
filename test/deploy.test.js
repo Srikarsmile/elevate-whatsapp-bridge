@@ -20,30 +20,98 @@ test("nginx route keeps the bridge local, bounded and rate limited", async () =>
   assert.match(httpConfig, /limit_req_zone .*zone=elevate_whatsapp:/);
   assert.match(location, /location \/elevate-whatsapp\//);
   assert.match(location, /proxy_pass http:\/\/127\.0\.0\.1:3218\//);
-  assert.match(location, /client_max_body_size 32k/);
+  assert.match(location, /client_max_body_size 256k/);
   assert.match(location, /limit_req zone=elevate_whatsapp/);
+  assert.match(location, /access_log off;/);
+  const internalIndex = location.indexOf("location ^~ /elevate-whatsapp/v1/internal/");
+  const proxyIndex = location.indexOf("location /elevate-whatsapp/");
+  assert.ok(internalIndex >= 0 && internalIndex < proxyIndex);
+  assert.match(location, /location \^~ \/elevate-whatsapp\/v1\/internal\/ \{\s*return 404;/);
 });
 
 test("architecture source documents the implemented flow and contact number", async () => {
   const html = await read("assets/architecture.html");
-  assert.match(html, /Automatic Campaign/);
   assert.match(html, /Sarvam Voice Agent/);
-  assert.match(html, /Hermes Bridge/);
+  assert.match(html, /Callback Scheduler/);
+  assert.match(html, /Instant Outbound/);
+  assert.match(html, /Deterministic Evaluator/);
+  assert.match(html, /Tool-free Hermes/);
+  assert.match(html, /Human Approval/);
+  assert.match(html, /Regression Cases/);
   assert.match(html, /WhatsApp/);
-  assert.match(html, /Callback Booking/);
-  assert.match(html, /Resume PDF/);
-  assert.match(html, /Architecture PNG/);
   assert.match(html, /\+91 86398 85985/);
+  assert.doesNotMatch(html, /Priya/);
 });
 
-test("systemd pins callback and final artifact paths in private state", async () => {
+test("systemd pins every bridge state path and defaults callback dispatch to disabled", async () => {
   const unit = await read("deploy/elevate-whatsapp-bridge.service");
-  assert.match(
-    unit,
-    /^Environment=CALLBACKS_PATH=\/var\/lib\/elevate-whatsapp-bridge\/callbacks\.json$/m
+  for (const [key, file] of [
+    ["CALLBACKS_PATH", "callbacks.json"],
+    ["OUTBOUND_EVENTS_PATH", "outbound-events.json"],
+    ["EVALUATION_JOBS_PATH", "evaluation-jobs.json"],
+    ["FEEDBACK_PATH", "feedback.json"],
+    ["EVALUATION_CASES_PATH", "evaluation-cases.json"],
+    ["RECOMMENDATIONS_PATH", "recommendations.json"],
+  ]) {
+    assert.match(
+      unit,
+      new RegExp(`^Environment=${key}=/var/lib/elevate-whatsapp-bridge/${file}$`, "m")
+    );
+  }
+  assert.ok(
+    unit.indexOf("Environment=CALLBACK_DISPATCH_MODE=disabled") <
+      unit.indexOf("EnvironmentFile=/etc/elevate-whatsapp-bridge.env")
   );
+  assert.doesNotMatch(unit, /^Environment=CALLBACK_DISPATCH_MODE=live$/m);
   assert.match(
     unit,
     /^Environment=RESUME_PATH=\/var\/lib\/elevate-whatsapp-bridge\/assets\/Srikar-Reddy-Software-Engineer-CV\.pdf$/m
   );
+});
+
+test("feedback worker runs as a separate hardened identity", async () => {
+  const unit = await read("deploy/elevate-feedback-worker.service");
+  assert.match(unit, /^User=elevate-feedback$/m);
+  assert.match(unit, /^Group=elevate-feedback$/m);
+  assert.doesNotMatch(unit, /^User=(root|elevate-wa)$/m);
+  assert.match(unit, /^WorkingDirectory=\/var\/empty\/elevate-feedback-worker$/m);
+  assert.match(unit, /^NoNewPrivileges=true$/m);
+  assert.match(unit, /^ProtectSystem=strict$/m);
+  assert.match(unit, /^ProtectHome=true$/m);
+  assert.match(unit, /^PrivateTmp=true$/m);
+  assert.match(unit, /^CapabilityBoundingSet=$/m);
+  assert.match(unit, /^ReadWritePaths=\/var\/lib\/elevate-feedback-worker$/m);
+  assert.doesNotMatch(unit, /CALLBACK_DISPATCH_MODE=live/);
+});
+
+test("worker environment example names settings without containing secrets", async () => {
+  const example = await read("deploy/elevate-feedback-worker.env.example");
+  assert.match(example, /^FEEDBACK_BRIDGE_URL=http:\/\/127\.0\.0\.1:3218$/m);
+  assert.match(example, /^FEEDBACK_WORKER_TOKEN=$/m);
+  assert.match(example, /^HERMES_EVAL_MODEL=gpt-5\.6-sol$/m);
+  assert.match(example, /^HERMES_EVAL_PROVIDER=openai-codex$/m);
+  assert.doesNotMatch(example, /sk-|Bearer |[a-f0-9]{32,}/i);
+});
+
+test("runbook documents no-call gates, feedback approval, and neutral agent wording", async () => {
+  const runbook = await read("docs/demo-runbook.md");
+  assert.match(runbook, /918639885985/);
+  assert.match(runbook, /918688664337/);
+  assert.match(runbook, /CALLBACK_DISPATCH_MODE=disabled/);
+  assert.match(runbook, /dry_run/);
+  assert.match(runbook, /dispatch_unknown/);
+  assert.match(runbook, /human approval/i);
+  assert.match(runbook, /30 days/);
+  assert.doesNotMatch(runbook, /Priya/);
+});
+
+test("service entry point wires persistent callback and feedback processing", async () => {
+  const source = await read("src/index.js");
+  assert.match(source, /loadConfig/);
+  assert.match(source, /createCallbackScheduler/);
+  assert.match(source, /createEventProcessor/);
+  assert.match(source, /createEvaluationQueue/);
+  assert.match(source, /createFeedbackLoop/);
+  assert.match(source, /callbackScheduler\.start/);
+  assert.match(source, /eventProcessor\.start/);
 });

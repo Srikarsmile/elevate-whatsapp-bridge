@@ -3,19 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ElevateBox Hybrid Voice Agent Architecture</title>
+  <title>ElevateBox Voice Agent Architecture</title>
   <style>
     :root {
-      --ink: #172026;
-      --muted: #59656c;
-      --paper: #f6f7f4;
-      --white: #ffffff;
+      --ink: #172126;
+      --muted: #5f6a6f;
+      --paper: #f4f6f3;
+      --panel: #ffffff;
+      --line: #c9d1cf;
       --teal: #087f70;
-      --coral-soft: #fbe5df;
-      --gold: #b77a13;
-      --gold-soft: #f7edcf;
-      --blue-soft: #e2edf4;
-      --line: #ccd4d4;
+      --teal-soft: #dcefeb;
+      --coral: #c94f3d;
+      --coral-soft: #fae6e1;
+      --gold: #9b6a0d;
+      --gold-soft: #f5ebce;
+      --blue: #2d6480;
+      --blue-soft: #e0edf3;
+      --green: #36794a;
+      --green-soft: #e3efe5;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -31,125 +36,139 @@
     main {
       width: 100%;
       height: 100%;
-      padding: 52px 68px 42px;
+      padding: 42px 58px 34px;
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      gap: 28px;
+      grid-template-rows: 104px 360px 298px 102px;
+      gap: 18px;
     }
     header {
       display: flex;
+      align-items: start;
       justify-content: space-between;
-      align-items: end;
       gap: 40px;
-      padding-bottom: 22px;
       border-bottom: 2px solid var(--ink);
     }
     .eyebrow {
-      margin: 0 0 9px;
+      margin: 0 0 7px;
       color: var(--teal);
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 800;
       text-transform: uppercase;
     }
     h1 {
       margin: 0;
-      max-width: 920px;
-      font-size: 50px;
-      line-height: 1.04;
+      font-size: 40px;
+      line-height: 1.06;
       font-weight: 820;
     }
-    .meta {
-      max-width: 390px;
+    .principle {
+      width: 435px;
+      padding-top: 4px;
       color: var(--muted);
-      font-size: 17px;
-      line-height: 1.45;
+      font-size: 16px;
+      line-height: 1.42;
       text-align: right;
     }
-    .flow {
+    .band {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 26px;
-    }
-    .node {
-      min-height: 208px;
-      padding: 23px 23px 21px;
-      background: var(--white);
-      border: 1px solid var(--line);
-      border-top: 7px solid var(--teal);
-      border-radius: 8px;
-      display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      gap: 10px;
-      position: relative;
-    }
-    .node:nth-child(2) { border-top-color: var(--gold); }
-    .node:nth-child(3) { border-top-color: #dc5b43; }
-    .node:nth-child(4) { border-top-color: var(--ink); }
-    .node:not(:last-child)::after {
-      content: ">";
-      position: absolute;
-      right: -23px;
-      top: 78px;
-      width: 19px;
-      background: var(--paper);
-      color: var(--ink);
-      font-size: 28px;
-      font-weight: 850;
-      text-align: center;
-      z-index: 2;
-    }
-    .number { color: var(--muted); font-size: 14px; font-weight: 800; }
-    h2 { margin: 0; font-size: 27px; line-height: 1.12; }
-    .node p { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.4; }
-    .tech { color: var(--ink); font-size: 13px; font-weight: 800; text-transform: uppercase; }
-    .actions {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 20px;
-      align-items: stretch;
-    }
-    .action {
-      min-height: 205px;
-      padding: 22px 24px;
-      border-radius: 8px;
-      display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: 28px 1fr;
       gap: 10px;
     }
-    .action.hot { background: var(--coral-soft); }
-    .action.callback { background: var(--gold-soft); }
-    .action.package { background: var(--blue-soft); }
-    .badge {
-      justify-self: start;
-      min-width: 96px;
-      padding: 7px 10px;
-      border: 1px solid currentColor;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 800;
-      text-align: center;
+    .band-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 820;
       text-transform: uppercase;
     }
-    .action h3 { margin: 0; font-size: 22px; line-height: 1.18; }
-    .action p { margin: 0; color: #374247; font-size: 16px; line-height: 1.4; }
-    .output {
-      padding-top: 10px;
-      border-top: 1px solid rgba(23, 32, 38, 0.18);
-      color: var(--ink);
-      font-size: 14px;
-      font-weight: 780;
+    .band-title::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: var(--line);
     }
-    footer {
-      display: flex;
-      justify-content: space-between;
+    .runtime {
+      display: grid;
+      grid-template-columns: 1.05fr 54px 1fr 54px 1fr 54px 1.05fr;
+      grid-template-rows: 188px 82px;
+      gap: 12px 0;
       align-items: center;
-      gap: 30px;
-      padding-top: 18px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 15px;
     }
-    .contact { color: var(--ink); font-size: 20px; font-weight: 820; white-space: nowrap; }
+    .node {
+      height: 188px;
+      padding: 21px 22px 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-top: 7px solid var(--teal);
+      border-radius: 7px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 8px;
+    }
+    .node.guard { border-top-color: var(--gold); }
+    .node.scheduler { border-top-color: var(--coral); }
+    .node.outbound { border-top-color: var(--blue); }
+    .step { color: var(--muted); font-size: 12px; font-weight: 820; text-transform: uppercase; }
+    h2 { margin: 0; font-size: 23px; line-height: 1.12; }
+    .node p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .tag { color: var(--ink); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .arrow { color: var(--ink); font-size: 30px; font-weight: 700; text-align: center; }
+    .branch {
+      grid-column: 1 / 8;
+      height: 82px;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1.45fr;
+      gap: 14px;
+    }
+    .rail {
+      min-width: 0;
+      padding: 13px 16px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+    .rail strong { flex: 0 0 auto; font-size: 15px; }
+    .rail span { color: #3e494d; font-size: 13px; line-height: 1.35; }
+    .whatsapp { background: var(--green-soft); border-left: 5px solid var(--green); }
+    .states { background: var(--gold-soft); border-left: 5px solid var(--gold); }
+    .safety { background: var(--coral-soft); border-left: 5px solid var(--coral); }
+    .feedback-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 38px 1.05fr 38px 1.05fr 38px 1.05fr 38px 1.05fr 38px 1.05fr;
+      align-items: stretch;
+    }
+    .feedback-node {
+      padding: 17px 15px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      display: grid;
+      grid-template-rows: 22px auto 1fr auto;
+      gap: 7px;
+    }
+    .feedback-node:nth-of-type(3n+1) { border-bottom: 5px solid var(--blue); }
+    .feedback-node:nth-of-type(3n+3) { border-bottom: 5px solid var(--teal); }
+    .feedback-node:nth-of-type(3n+5) { border-bottom: 5px solid var(--gold); }
+    .feedback-node:nth-of-type(3n+7) { border-bottom: 5px solid var(--coral); }
+    .feedback-node:nth-of-type(3n+9) { border-bottom: 5px solid var(--blue); }
+    .feedback-node:nth-of-type(3n+11) { border-bottom: 5px solid var(--green); }
+    .feedback-node h3 { margin: 0; font-size: 18px; line-height: 1.17; }
+    .feedback-node p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.38; }
+    .feedback-node small { color: var(--ink); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+    .feedback-arrow { align-self: center; color: var(--muted); font-size: 24px; text-align: center; }
+    footer {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr auto;
+      gap: 22px;
+      align-items: center;
+      padding-top: 17px;
+      border-top: 1px solid var(--line);
+    }
+    .foot-item { color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .foot-item strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 14px; }
+    .contact { color: var(--ink); font-size: 19px; font-weight: 820; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -157,59 +176,83 @@
     <header>
       <div>
         <p class="eyebrow">ElevateBox working prototype</p>
-        <h1>One live conversation, three immediate actions</h1>
+        <h1>Reliable callbacks with a governed learning loop</h1>
       </div>
-      <div class="meta">Sarvam owns the low-latency voice loop. Hermes owns authenticated actions, persistence, delivery, and duplicate prevention.</div>
+      <div class="principle">Sarvam owns the real-time conversation. The bridge owns consent, durable actions, delivery truth, evaluation evidence, and controlled improvement.</div>
     </header>
-    <section class="flow" aria-label="Primary system flow">
-      <article class="node">
-        <div class="number">01 / START</div>
-        <h2>Automatic Campaign</h2>
-        <p>A one-contact Sarvam campaign dials the assignment number from the active voice line.</p>
-        <div class="tech">Sarvam Vobiz telephony</div>
-      </article>
-      <article class="node">
-        <div class="number">02 / CONVERSE</div>
-        <h2>Sarvam Voice Agent</h2>
-        <p>Listens, handles interruptions, and speaks Telugu, Hindi or English with natural code-switching.</p>
-        <div class="tech">Streaming STT + LLM + TTS</div>
-      </article>
-      <article class="node">
-        <div class="number">03 / UNDERSTAND</div>
-        <h2>Lead Intelligence</h2>
-        <p>Captures business, products, features, budget and timeline, then classifies Hot, Warm or Cold.</p>
-        <div class="tech">Structured call variables</div>
-      </article>
-      <article class="node">
-        <div class="number">04 / ACT</div>
-        <h2>Hermes Bridge</h2>
-        <p>Authenticates tool calls, validates the recipient, persists actions and suppresses duplicates.</p>
-        <div class="tech">HTTPS + bearer auth + idempotency</div>
-      </article>
+
+    <section class="band" aria-label="Call and callback runtime">
+      <div class="band-title">Runtime path</div>
+      <div class="runtime">
+        <article class="node">
+          <span class="step">01 / listen</span>
+          <h2>Sarvam Voice Agent</h2>
+          <p>Handles Telugu, Hindi, English, code-switching, and interruptions while asking one question at a time.</p>
+          <span class="tag">Conversation + tool request</span>
+        </article>
+        <div class="arrow">&#8594;</div>
+        <article class="node guard">
+          <span class="step">02 / confirm</span>
+          <h2>Authenticated Booking</h2>
+          <p>Validates consent, the exact future time, the two-number allowlist, and an idempotency key.</p>
+          <span class="tag">No inferred consent</span>
+        </article>
+        <div class="arrow">&#8594;</div>
+        <article class="node scheduler">
+          <span class="step">03 / persist</span>
+          <h2>Callback Scheduler</h2>
+          <p>Claims due work before dispatch and quarantines ambiguous outcomes to prevent accidental redials.</p>
+          <span class="tag">Durable callback state</span>
+        </article>
+        <div class="arrow">&#8594;</div>
+        <article class="node outbound">
+          <span class="step">04 / call</span>
+          <h2>Instant Outbound</h2>
+          <p>Sends one Sarvam request only in live mode. Provider webhooks become the authoritative outcome.</p>
+          <span class="tag">Disabled by default</span>
+        </article>
+
+        <div class="branch">
+          <div class="rail whatsapp"><strong>WhatsApp</strong><span>Requested follow-up and approved project artifacts through the linked transport.</span></div>
+          <div class="rail states"><strong>Explicit states</strong><span>pending / dispatching / dispatched / completed / failed / dispatch_unknown</span></div>
+          <div class="rail safety"><strong>Safety gate</strong><span>disabled &#8594; dry_run &#8594; live requires an operator change. Restart, review, and promotion never initiate calls.</span></div>
+        </div>
+      </div>
     </section>
-    <section class="actions" aria-label="Action outcomes">
-      <article class="action hot">
-        <span class="badge">Mid-call</span>
-        <h3>High intent reaches WhatsApp immediately</h3>
-        <p>Hot intent or an explicit request sends the facts captured so far without blocking the conversation.</p>
-        <div class="output">Output: contextual WhatsApp before hang-up</div>
-      </article>
-      <article class="action callback">
-        <span class="badge">Schedule</span>
-        <h3>Spoken time becomes a Callback Booking</h3>
-        <p>A confirmed India-time phrase becomes a durable, idempotent booking with a redacted status endpoint.</p>
-        <div class="output">Output: booking ID + normalized callback time</div>
-      </article>
-      <article class="action package">
-        <span class="badge">Post-call</span>
-        <h3>The final package uses their own words</h3>
-        <p>Context and contact details are followed by the required Architecture PNG and Resume PDF.</p>
-        <div class="output">Output: note under 200 words + two artifacts</div>
-      </article>
+
+    <section class="band" aria-label="Post-call feedback loop">
+      <div class="band-title">Post-call feedback loop</div>
+      <div class="feedback-grid">
+        <article class="feedback-node">
+          <span class="step">01</span><h3>Outcome Webhook</h3><p>Signed Sarvam event and transcript reference.</p><small>Provider truth</small>
+        </article>
+        <div class="feedback-arrow">&#8594;</div>
+        <article class="feedback-node">
+          <span class="step">02</span><h3>Event Store</h3><p>Redacted, idempotent event and bounded transcript.</p><small>30-day retention</small>
+        </article>
+        <div class="feedback-arrow">&#8594;</div>
+        <article class="feedback-node">
+          <span class="step">03</span><h3>Deterministic Evaluator</h3><p>Checks listening, turns, confirmation, facts, and tool honesty.</p><small>Fast + explainable</small>
+        </article>
+        <div class="feedback-arrow">&#8594;</div>
+        <article class="feedback-node">
+          <span class="step">04</span><h3>Tool-free Hermes</h3><p>Scores a fixed rubric with no shell, network, or bridge tools.</p><small>GPT-5.6 Sol</small>
+        </article>
+        <div class="feedback-arrow">&#8594;</div>
+        <article class="feedback-node">
+          <span class="step">05</span><h3>Regression Cases</h3><p>Groups numeric failures across distinct interactions.</p><small>Evidence only</small>
+        </article>
+        <div class="feedback-arrow">&#8594;</div>
+        <article class="feedback-node">
+          <span class="step">06</span><h3>Human Approval</h3><p>Review, reject, approve, and manually promote a version.</p><small>No self-editing</small>
+        </article>
+      </div>
     </section>
+
     <footer>
-      <span>WhatsApp Web is the experiment transport. Meta Cloud API is the production adapter.</span>
-      <span class="contact">WhatsApp or text Srikar: +91 86398 85985</span>
+      <div class="foot-item"><strong>What improves</strong>Interruptibility, one-question turns, callback reliability, factual grounding, and honest delivery status.</div>
+      <div class="foot-item"><strong>What stays controlled</strong>Prompts, agent versions, live dispatch, WhatsApp delivery, credentials, and production rollout.</div>
+      <div class="contact">WhatsApp or text: +91 86398 85985</div>
     </footer>
   </main>
 </body>

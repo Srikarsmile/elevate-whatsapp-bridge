@@ -1,0 +1,37 @@
+[Unit]
+Description=ElevateBox Tool-free Hermes Feedback Worker
+After=network-online.target elevate-whatsapp-bridge.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=elevate-feedback
+Group=elevate-feedback
+WorkingDirectory=/var/empty/elevate-feedback-worker
+EnvironmentFile=/etc/elevate-feedback-worker.env
+ExecStart=/usr/bin/node /srv/elevate-whatsapp-bridge/src/feedback-worker.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/elevate-feedback-worker
+
+[Install]
+WantedBy=multi-user.target
