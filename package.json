@@ -1,0 +1,17 @@
+{
+  "name": "elevate-whatsapp-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/*.js",
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "pino": "10.3.1",
+    "qrcode": "1.5.4",
+    "zod": "4.4.3"
+  }
+}
