@@ -74,6 +74,31 @@ test("applies stable conversational deductions and numeric-only evidence", () =>
   assert.doesNotMatch(JSON.stringify(result.findings), /Understood|word0/);
 });
 
+test("accepts the deployed Sarvam output variable names as complete discovery", () => {
+  const result = evaluateDeterministically({
+    event: {
+      transcript: [
+        { role: "agent", en_text: "What does your shop sell?" },
+        { role: "user", en_text: "Handmade clothing." },
+      ],
+      final_agent_variables: {
+        business_type: "fashion retail",
+        product_count: "about 80",
+        required_features: "catalogue and checkout",
+        budget_range: "around 60000 rupees",
+        launch_timeline: "next month",
+        decision_maker: "owner",
+        intent_level: "Warm",
+      },
+      tool_results: [],
+      received_at: "2026-08-23T05:00:00.000Z",
+    },
+  });
+
+  assert.equal(result.metrics.missing_required_variables, 0);
+  assert.ok(!result.findings.some((finding) => finding.code === "missing_required_variables"));
+});
+
 test("caps repeated deductions and floors the score at zero", () => {
   const transcript = [];
   for (let index = 0; index < 5; index += 1) {

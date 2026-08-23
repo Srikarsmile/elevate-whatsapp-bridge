@@ -1,11 +1,11 @@
 const REQUIRED_VARIABLES = Object.freeze([
-  "business",
-  "products",
-  "features",
-  "budget",
-  "timeline",
-  "decision_maker",
-  "intent",
+  ["business", "business_type"],
+  ["products", "product_count"],
+  ["features", "required_features"],
+  ["budget", "budget_range"],
+  ["timeline", "launch_timeline"],
+  ["decision_maker"],
+  ["intent", "intent_level"],
 ]);
 
 function wordCount(text) {
@@ -194,8 +194,11 @@ export function evaluateDeterministically({ event, callback = null }) {
   }
 
   const variables = event.final_agent_variables || {};
-  const missingVariables = REQUIRED_VARIABLES.filter(
-    (name) => variables[name] === null || variables[name] === undefined || variables[name] === ""
+  const missingVariables = REQUIRED_VARIABLES.filter((aliases) =>
+    aliases.every(
+      (name) =>
+        variables[name] === null || variables[name] === undefined || variables[name] === ""
+    )
   );
   if (missingVariables.length > 0) {
     const missingCount = Math.min(missingVariables.length, 6);
