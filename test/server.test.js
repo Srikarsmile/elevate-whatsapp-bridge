@@ -228,6 +228,10 @@ function baseOptions(overrides = {}) {
       ),
     }),
     architectureImagePath: "/private/architecture.png",
+    resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+    repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
+    implementationNote:
+      "The Sarvam agent qualifies the lead while Hermes handles durable WhatsApp and callback actions.",
     logger: { info: (entry) => logs.push(entry), error: (entry) => logs.push(entry) },
     calls,
     logs,
@@ -288,7 +292,15 @@ function onEndEvent(overrides = {}) {
     status: "connected",
     duration: 57,
     user_phone_number: "+918639885985",
-    final_agent_variables: { intent_level: "Warm" },
+    final_agent_variables: {
+      intent_level: "Warm",
+      business_type: "handmade clothing",
+      product_count: "about 80",
+      budget: "around 60000 rupees",
+      timeline: "next month",
+      required_features: "catalog, UPI payments and WhatsApp support",
+      follow_up_summary: "Needs a launch before the festival season",
+    },
     interaction_transcript: [
       { role: "agent", en_text: "What would you like to improve?" },
       { role: "user", en_text: "I need a faster website." },
@@ -571,7 +583,7 @@ test("hides webhook endpoints behind their path token", async () => {
   assert.equal(options.callEventStore.list().length, 0);
 });
 
-test("stores a valid on-end event without changing callback state", async () => {
+test("stores a valid on-end event and sends the assignment package exactly once", async () => {
   const options = baseOptions();
   await withServer(options, async (baseUrl) => {
     const first = await postWebhook(baseUrl, "on-end", onEndEvent());
@@ -583,6 +595,80 @@ test("stores a valid on-end event without changing callback state", async () => 
   });
   assert.equal(options.callEventStore.list().length, 1);
   assert.equal(options.callbackStore.transitions.length, 0);
+  assert.equal(options.calls.length, 1);
+  assert.equal(options.calls[0].to, "918639885985");
+  assert.match(options.calls[0].text, /Business: handmade clothing/);
+  assert.match(options.calls[0].text, /Products: about 80/);
+  assert.match(options.calls[0].text, /Budget: around 60000 rupees/);
+  assert.match(options.calls[0].text, /Timeline: next month/);
+  assert.match(options.calls[0].text, /catalog, UPI payments and WhatsApp support/);
+  assert.match(options.calls[0].text, /launch before the festival season/);
+  assert.match(options.calls[0].text, /Lead status: Warm/);
+  assert.deepEqual(
+    options.calls[0].attachments.map(({ kind }) => kind),
+    ["image", "document"]
+  );
+});
+
+test("uses recent user speech when the agent did not produce a follow-up summary", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    const response = await postWebhook(
+      baseUrl,
+      "on-end",
+      onEndEvent({
+        final_agent_variables: { intent_level: "cold" },
+        interaction_transcript: [
+          { role: "agent", en_text: "What are you looking for?" },
+          { role: "user", en_text: "I am only comparing options this month." },
+        ],
+      })
+    );
+    assert.equal(response.status, 200);
+  });
+  assert.equal(options.calls.length, 1);
+  assert.match(options.calls[0].text, /Context: I am only comparing options this month/);
+  assert.match(options.calls[0].text, /Lead status: Cold/);
+});
+
+test("does not send a post-call package when the call did not connect", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    const response = await postWebhook(
+      baseUrl,
+      "on-end",
+      onEndEvent({
+        status: "no_answer",
+        duration: 0,
+        interaction_transcript: null,
+        final_agent_variables: null,
+      })
+    );
+    assert.equal(response.status, 200);
+  });
+  assert.equal(options.calls.length, 0);
+});
+
+test("retries a failed post-call delivery without duplicating the call event", async () => {
+  let attempts = 0;
+  const options = baseOptions({
+    transport: {
+      status: () => "connected",
+      send: async (message) => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("temporary transport failure");
+        options.calls.push(message);
+        return { messageId: "wamid.retry" };
+      },
+    },
+  });
+  await withServer(options, async (baseUrl) => {
+    assert.equal((await postWebhook(baseUrl, "on-end", onEndEvent())).status, 503);
+    assert.equal((await postWebhook(baseUrl, "on-end", onEndEvent())).status, 200);
+  });
+  assert.equal(options.callEventStore.list().length, 1);
+  assert.equal(attempts, 2);
+  assert.equal(options.calls.length, 1);
 });
 
 test("rejects malformed, oversized, unknown, and uncorrelated webhook payloads", async () => {

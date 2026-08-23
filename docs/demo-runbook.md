@@ -15,7 +15,7 @@
 3. A callback is created only after the caller gives a specific future time and confirms it.
 4. The callback scheduler claims the booking once and persists the claim before dispatch.
 5. Sarvam's outcome webhook supplies authoritative call status and transcript data.
-6. Hot leads receive the contextual mid-call WhatsApp follow-up; the post-call architecture summary can be sent when requested. The bridge never attaches a resume.
+6. Hot leads receive the contextual mid-call WhatsApp follow-up. Every connected call triggers one idempotent post-call package with actual context, Srikar's number, the architecture image, resume, repository link, and implementation note.
 
 ## Callback states
 
@@ -34,8 +34,8 @@
 4. Confirm the WhatsApp transport is connected if the demo includes a follow-up message.
 5. Run `npm test`, `npm run test:integration`, and `npm run check` on the exact release.
 6. Start with `CALLBACK_DISPATCH_MODE=dry_run`, create one future booking, and verify the dry-run record.
-7. Return the service to `CALLBACK_DISPATCH_MODE=disabled` after the rehearsal.
-8. Change to `live` only with fresh approval immediately before the call. Restarting the service alone must never place one.
+7. Verify there are no unintended `scheduled` bookings before changing modes.
+8. Change to `live` only with explicit operator approval. Enabling or restarting the service does not create a booking or place a call by itself.
 
 ## Conversation behavior
 
@@ -65,7 +65,7 @@ Raw transcript and event records are retained for 30 days. Evaluation cases keep
 | Hot, Warm, Cold classification | Persisted intent output with post-call evaluation |
 | Mid-call WhatsApp | Authenticated, allowlisted message endpoint |
 | Spoken callback booking | Confirmed time, durable booking ID, and explicit dispatch states |
-| Post-call material | Contextual WhatsApp message and architecture diagram; no resume attachment |
+| Post-call material | Automatic, idempotent WhatsApp package with call context, architecture, resume, repository, note, and contact number |
 | Contact number | `+91 86398 85985` in the diagram and approved follow-up content |
 | Continuous improvement | Deterministic checks, tool-free Hermes scoring, regression cases, and human approval |
 
@@ -76,4 +76,4 @@ Raw transcript and event records are retained for 30 days. Evaluation cases keep
 - If a booking enters `dispatch_unknown`, check Sarvam call logs and reconcile it manually. Do not redial automatically.
 - If the worker is unavailable, deterministic evaluation continues and Hermes jobs remain queued.
 - If a recommendation is wrong, reject it. The running voice agent remains unchanged throughout review.
-- After any live test, restore `CALLBACK_DISPATCH_MODE=disabled` and confirm health before leaving the system unattended.
+- After a live test, review callback state and return to `disabled` whenever unattended live dispatch is not required.

@@ -39,6 +39,8 @@ test("architecture source documents the implemented flow and contact number", as
   assert.match(html, /Human Approval/);
   assert.match(html, /Regression Cases/);
   assert.match(html, /WhatsApp/);
+  assert.match(html, /resume/);
+  assert.match(html, /repository/);
   assert.match(html, /\+91 86398 85985/);
   assert.doesNotMatch(html, /Priya/);
 });
@@ -98,6 +100,8 @@ test("runbook documents no-call gates, feedback approval, and neutral agent word
   assert.match(runbook, /dry_run/);
   assert.match(runbook, /dispatch_unknown/);
   assert.match(runbook, /human approval/i);
+  assert.match(runbook, /resume/i);
+  assert.match(runbook, /repository/i);
   assert.match(runbook, /30 days/);
   assert.doesNotMatch(runbook, /Priya/);
 });

@@ -6,6 +6,7 @@ import { parseCallbackRequest } from "./callback.js";
 import { EvaluationQueueError } from "./evaluation-queue.js";
 import { FeedbackLoopError } from "./feedback-loop.js";
 import { formatMessage, parseMessageRequest } from "./message.js";
+import { buildPostCallMessageRequest } from "./post-call-message.js";
 
 const DEFAULT_BODY_LIMIT = 32 * 1024;
 const DEFAULT_WEBHOOK_BODY_LIMIT = 256 * 1024;
@@ -160,6 +161,8 @@ export function createBridgeServer({
   feedbackWorkerToken = null,
   evaluationQueue = null,
   architectureImagePath = null,
+  resumePath = null,
+  repositoryUrl = null,
   implementationNote = null,
   bodyLimitBytes = DEFAULT_BODY_LIMIT,
   webhookBodyLimitBytes = DEFAULT_WEBHOOK_BODY_LIMIT,
@@ -182,6 +185,36 @@ export function createBridgeServer({
   }
   const allowRequest = createRateLimiter(rateLimit);
   const inFlight = new Map();
+
+  async function deliverMessage(parsed) {
+    const requestId = parsed.request_id;
+    const previous = store.get(requestId);
+    if (previous) return { ...previous, duplicate: true };
+    if (inFlight.has(requestId)) {
+      return { ...(await inFlight.get(requestId)), duplicate: true };
+    }
+
+    const delivery = (async () => {
+      const message = formatMessage(parsed, {
+        architectureImagePath,
+        resumePath,
+        repositoryUrl,
+        implementationNote,
+      });
+      await transport.send({ to: parsed.to, ...message });
+      const result = { ok: true, requestId };
+      await store.put(requestId, result);
+      logger.info({ requestId, stage: parsed.stage, status: "delivered" });
+      return result;
+    })();
+    inFlight.set(requestId, delivery);
+
+    try {
+      return { ...(await delivery), duplicate: false };
+    } finally {
+      inFlight.delete(requestId);
+    }
+  }
 
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
@@ -321,6 +354,26 @@ export function createBridgeServer({
             bookingId,
             status: "callback_transition_error",
           });
+        }
+      }
+
+      if (sarvamWebhook.kind === "on-end" && event.status === "connected") {
+        let postCallRequest;
+        try {
+          postCallRequest = buildPostCallMessageRequest({
+            event,
+            recipientPhone: body.user_phone_number,
+          });
+          await deliverMessage(postCallRequest);
+        } catch {
+          logger.error({
+            eventId: event.event_id,
+            requestId: postCallRequest?.request_id,
+            stage: "post_call",
+            status: "transport_error",
+          });
+          sendJson(response, 503, { ok: false, error: "Post-call delivery unavailable" });
+          return;
         }
       }
       logger.info({
@@ -545,39 +598,12 @@ export function createBridgeServer({
       return;
     }
 
-    const previous = store.get(requestId);
-    if (previous) {
-      sendJson(response, 200, { ...previous, duplicate: true });
-      return;
-    }
-
-    if (inFlight.has(requestId)) {
-      const pending = await inFlight.get(requestId);
-      sendJson(response, 200, { ...pending, duplicate: true });
-      return;
-    }
-
-    const delivery = (async () => {
-      const message = formatMessage(parsed, {
-        architectureImagePath,
-        implementationNote,
-      });
-      await transport.send({ to: parsed.to, ...message });
-      const result = { ok: true, requestId };
-      await store.put(requestId, result);
-      logger.info({ requestId, stage: parsed.stage, status: "delivered" });
-      return result;
-    })();
-    inFlight.set(requestId, delivery);
-
     try {
-      const result = await delivery;
-      sendJson(response, 202, { ...result, duplicate: false });
+      const result = await deliverMessage(parsed);
+      sendJson(response, result.duplicate ? 200 : 202, result);
     } catch {
       logger.error({ requestId, stage: parsed.stage, status: "transport_error" });
       sendJson(response, 503, { ok: false, error: "WhatsApp delivery unavailable" });
-    } finally {
-      inFlight.delete(requestId);
     }
   });
 }

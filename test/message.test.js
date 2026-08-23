@@ -75,7 +75,7 @@ test("formats captured facts and always includes Srikar's contact number", () =>
   assert.deepEqual(result.attachments, []);
 });
 
-test("adds the architecture artifact without attaching a resume to a post-call follow-up", () => {
+test("adds the required assignment artifacts and repository to a post-call follow-up", () => {
   const request = parseMessageRequest({
     request_id: "call-789:post-call",
     to: "918688664337",
@@ -86,6 +86,8 @@ test("adds the architecture artifact without attaching a resume to a post-call f
 
   const result = formatMessage(request, {
     architectureImagePath: "/private/architecture.png",
+    resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+    repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
     implementationNote:
       "The live Sarvam agent qualifies the lead while Hermes handles WhatsApp and callback actions. The linked WhatsApp transport is experimental; Meta Cloud API is the production replacement.",
   });
@@ -94,12 +96,22 @@ test("adds the architecture artifact without attaching a resume to a post-call f
   assert.doesNotMatch(result.text, /Priya/);
   assert.match(result.text, /Lead status: Warm/);
   assert.match(result.text, /live Sarvam agent qualifies the lead/);
+  assert.match(
+    result.text,
+    /https:\/\/github\.com\/Srikarsmile\/elevate-whatsapp-bridge/
+  );
   assert.deepEqual(result.attachments, [
     {
       path: "/private/architecture.png",
       kind: "image",
       fileName: "elevatebox-architecture.png",
       mimetype: "image/png",
+    },
+    {
+      path: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+      kind: "document",
+      fileName: "Srikar-Reddy-Software-Engineer-CV.pdf",
+      mimetype: "application/pdf",
     },
   ]);
 });
@@ -115,6 +127,8 @@ test("rejects a post-call follow-up without the architecture artifact", () => {
   assert.throws(
     () =>
       formatMessage(request, {
+        resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+        repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
         implementationNote: "Working demo note.",
       }),
     /architecture/i
@@ -133,8 +147,33 @@ test("rejects a post-call implementation note over 200 words", () => {
     () =>
       formatMessage(request, {
         architectureImagePath: "/private/architecture.png",
+        resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+        repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
         implementationNote: Array.from({ length: 201 }, () => "word").join(" "),
       }),
     /200 words/
+  );
+});
+
+test("rejects a post-call follow-up without the resume or repository", () => {
+  const request = parseMessageRequest({
+    request_id: "call-792:post-call",
+    to: "918688664337",
+    stage: "post_call",
+    classification: "Hot",
+  });
+  const base = {
+    architectureImagePath: "/private/architecture.png",
+    implementationNote: "Working demo note.",
+  };
+
+  assert.throws(() => formatMessage(request, base), /resume/i);
+  assert.throws(
+    () =>
+      formatMessage(request, {
+        ...base,
+        resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+      }),
+    /repository/i
   );
 });
