@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createFeedbackLoop } from "../src/feedback-loop.js";
 import { createBridgeServer } from "../src/server.js";
 
 const secret = "test-bridge-secret-with-enough-entropy";
@@ -71,6 +72,17 @@ async function postWebhook(baseUrl, route, body, token = webhookToken) {
   });
 }
 
+async function operatorRequest(baseUrl, path, { method = "GET", body, token = secret } = {}) {
+  return fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
 function createMemoryCallbackStore() {
   const byId = new Map();
   const byRequestId = new Map();
@@ -124,6 +136,25 @@ function createMemoryCallEventStore(operationOrder = []) {
   };
 }
 
+function createMemoryRecordStore(idField) {
+  const values = new Map();
+  return {
+    get: (id) => values.get(id),
+    list: (predicate = () => true) => [...values.values()].filter(predicate),
+    async put(value) {
+      const existing = values.get(value[idField]);
+      if (existing) return { record: existing, duplicate: true };
+      values.set(value[idField], Object.freeze({ ...value }));
+      return { record: values.get(value[idField]), duplicate: false };
+    },
+    async update(id, updater) {
+      if (!values.has(id)) throw new Error("not found");
+      values.set(id, Object.freeze({ ...updater(values.get(id)) }));
+      return values.get(id);
+    },
+  };
+}
+
 function baseOptions(overrides = {}) {
   const calls = [];
   const logs = [];
@@ -135,6 +166,15 @@ function baseOptions(overrides = {}) {
     return originalTransition(...args);
   };
   const callEventStore = createMemoryCallEventStore(operationOrder);
+  const feedbackStore = createMemoryRecordStore("feedback_id");
+  const caseStore = createMemoryRecordStore("case_id");
+  const recommendationStore = createMemoryRecordStore("recommendation_id");
+  const feedbackLoop = createFeedbackLoop({
+    eventStore: callEventStore,
+    feedbackStore,
+    caseStore,
+    recommendationStore,
+  });
   const transport = {
     status: () => "connected",
     send: async (message) => {
@@ -150,6 +190,7 @@ function baseOptions(overrides = {}) {
     callEventStore,
     webhookToken,
     phoneHashSalt,
+    feedbackLoop,
     healthStatus: () => ({
       callbackScheduler: "disabled",
       callbackDispatchMode: "disabled",
@@ -164,6 +205,9 @@ function baseOptions(overrides = {}) {
     calls,
     logs,
     operationOrder,
+    feedbackStore,
+    caseStore,
+    recommendationStore,
     ...overrides,
   };
 }
@@ -546,4 +590,140 @@ test("webhook logs omit tokens, transcripts, and full phone numbers", async () =
   assert.doesNotMatch(serialized, new RegExp(webhookToken));
   assert.doesNotMatch(serialized, /faster website|918639885985/);
   assert.match(serialized, /20260823\/on-end-123/);
+});
+
+test("records authenticated operator feedback idempotently without logging its note", async () => {
+  const options = baseOptions();
+  const feedback = {
+    request_id: "feedback-on-end-123",
+    interaction_id: "20260823/on-end-123",
+    category: "missed_callback",
+    severity: "critical",
+    note: "A private operator note about the missing callback.",
+  };
+  await withServer(options, async (baseUrl) => {
+    assert.equal((await postWebhook(baseUrl, "on-end", onEndEvent())).status, 200);
+    const first = await operatorRequest(baseUrl, "/v1/feedback", {
+      method: "POST",
+      body: feedback,
+    });
+    const duplicate = await operatorRequest(baseUrl, "/v1/feedback", {
+      method: "POST",
+      body: feedback,
+    });
+    assert.equal(first.status, 201);
+    const firstBody = await first.json();
+    assert.match(firstBody.feedbackId, /^fb-[a-f0-9]{24}$/);
+    assert.match(firstBody.recommendationId, /^rec-[a-f0-9]{24}$/);
+    assert.equal(firstBody.duplicate, false);
+    assert.equal(duplicate.status, 200);
+    assert.equal((await duplicate.json()).duplicate, true);
+  });
+  assert.equal(options.feedbackStore.list().length, 1);
+  assert.doesNotMatch(JSON.stringify(options.logs), /private operator note/);
+});
+
+test("rejects unauthorized, invalid, and unknown-interaction feedback", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    const payload = {
+      request_id: "feedback-unknown-123",
+      interaction_id: "unknown-interaction",
+      category: "missed_callback",
+      severity: "critical",
+      note: "Nothing arrived.",
+    };
+    assert.equal(
+      (
+        await operatorRequest(baseUrl, "/v1/feedback", {
+          method: "POST",
+          body: payload,
+          token: "wrong-token",
+        })
+      ).status,
+      401
+    );
+    assert.equal(
+      (
+        await operatorRequest(baseUrl, "/v1/feedback", {
+          method: "POST",
+          body: { ...payload, category: "invented" },
+        })
+      ).status,
+      400
+    );
+    assert.equal(
+      (
+        await operatorRequest(baseUrl, "/v1/feedback", {
+          method: "POST",
+          body: payload,
+        })
+      ).status,
+      404
+    );
+  });
+});
+
+test("lists, retrieves, approves, and promotes recommendations through operator APIs", async () => {
+  const options = baseOptions();
+  let recommendationId;
+  await withServer(options, async (baseUrl) => {
+    await postWebhook(baseUrl, "on-end", onEndEvent());
+    const feedback = await operatorRequest(baseUrl, "/v1/feedback", {
+      method: "POST",
+      body: {
+        request_id: "feedback-governance-123",
+        interaction_id: "20260823/on-end-123",
+        category: "tool_failure",
+        severity: "critical",
+        note: "The tool result was not honored.",
+      },
+    });
+    recommendationId = (await feedback.json()).recommendationId;
+
+    const list = await operatorRequest(baseUrl, "/v1/recommendations");
+    assert.equal(list.status, 200);
+    assert.equal((await list.json()).recommendations.length, 1);
+    const show = await operatorRequest(baseUrl, `/v1/recommendations/${recommendationId}`);
+    assert.equal(show.status, 200);
+    assert.equal((await show.json()).recommendation.state, "candidate");
+
+    const approved = await operatorRequest(
+      baseUrl,
+      `/v1/recommendations/${recommendationId}/approve`,
+      { method: "POST", body: {} }
+    );
+    assert.equal(approved.status, 200);
+    assert.equal((await approved.json()).recommendation.state, "approved");
+
+    const invalidReject = await operatorRequest(
+      baseUrl,
+      `/v1/recommendations/${recommendationId}/reject`,
+      { method: "POST", body: { reason: "too late" } }
+    );
+    assert.equal(invalidReject.status, 409);
+
+    const promoted = await operatorRequest(
+      baseUrl,
+      `/v1/recommendations/${recommendationId}/promote`,
+      {
+        method: "POST",
+        body: { version: 8, fixture_ids: ["missed-booking", "good-concise"] },
+      }
+    );
+    assert.equal(promoted.status, 200);
+    assert.equal((await promoted.json()).recommendation.state, "promoted");
+  });
+  assert.equal(options.recommendationStore.get(recommendationId).sarvam_version, 8);
+});
+
+test("returns not found for an unknown recommendation", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    const response = await operatorRequest(
+      baseUrl,
+      "/v1/recommendations/rec-ffffffffffffffffffffffff"
+    );
+    assert.equal(response.status, 404);
+  });
 });

@@ -86,6 +86,24 @@ test("evaluates an available transcript and queues exactly one Hermes job", asyn
   assert.equal(options.evaluationJobStore.count(), 1);
 });
 
+test("hands a completed deterministic evaluation to the feedback loop once", async () => {
+  const recorded = [];
+  const options = processorOptions({
+    feedbackLoop: {
+      recordEvaluation: async (call, evaluation) => {
+        recorded.push({ call, evaluation });
+      },
+    },
+  });
+  const processor = createEventProcessor(options);
+
+  await processor.runOnce();
+  await processor.runOnce();
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].call.event_id, "evt-111111111111111111111111");
+  assert.equal(recorded[0].evaluation.score, 100);
+});
+
 test("backs a transcript off at 30 seconds, two minutes, and ten minutes", async () => {
   let now = new Date("2026-08-23T05:00:00.000Z");
   let calls = 0;

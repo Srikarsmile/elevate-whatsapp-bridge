@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node --check src/*.js",
+    "recommendations": "node bin/recommendations.js",
     "start": "node src/index.js",
     "test": "node --test"
   },

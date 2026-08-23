@@ -3,6 +3,7 @@ import http from "node:http";
 
 import { parseOnEndEvent, parseOutboundEvent } from "./call-event.js";
 import { parseCallbackRequest } from "./callback.js";
+import { FeedbackLoopError } from "./feedback-loop.js";
 import { formatMessage, parseMessageRequest } from "./message.js";
 
 const DEFAULT_BODY_LIMIT = 32 * 1024;
@@ -92,6 +93,30 @@ function transitionMetadata(event) {
   );
 }
 
+function feedbackErrorStatus(error) {
+  if (!(error instanceof FeedbackLoopError)) return 400;
+  if (error.code === "not_found") return 404;
+  if (error.code === "invalid_state") return 409;
+  return 400;
+}
+
+function recommendationRoute(method, pathname) {
+  if (method === "GET" && pathname === "/v1/recommendations") {
+    return { action: "list", recommendationId: null };
+  }
+  const match = pathname.match(
+    /^\/v1\/recommendations\/(rec-[a-f0-9]{24})(?:\/(approve|reject|promote))?$/
+  );
+  if (!match) return null;
+  if (method === "GET" && !match[2]) {
+    return { action: "show", recommendationId: match[1] };
+  }
+  if (method === "POST" && match[2]) {
+    return { action: match[2], recommendationId: match[1] };
+  }
+  return null;
+}
+
 async function applyOutboundEvent(callbackStore, bookingId, event) {
   let booking = callbackStore.get(bookingId);
   if (booking.status === "dispatching") {
@@ -119,6 +144,7 @@ export function createBridgeServer({
   webhookToken = null,
   phoneHashSalt = null,
   healthStatus = null,
+  feedbackLoop = null,
   architectureImagePath = null,
   resumePath = null,
   implementationNote = null,
@@ -221,11 +247,19 @@ export function createBridgeServer({
 
     const isMessagePost = request.method === "POST" && url.pathname === "/v1/messages";
     const isCallbackPost = request.method === "POST" && url.pathname === "/v1/callbacks";
+    const isFeedbackPost = request.method === "POST" && url.pathname === "/v1/feedback";
+    const recommendation = recommendationRoute(request.method, url.pathname);
     const callbackStatusMatch =
       request.method === "GET"
         ? url.pathname.match(/^\/v1\/callbacks\/(cb-[a-f0-9]{16})$/)
         : null;
-    if (!isMessagePost && !isCallbackPost && !callbackStatusMatch) {
+    if (
+      !isMessagePost &&
+      !isCallbackPost &&
+      !isFeedbackPost &&
+      !recommendation &&
+      !callbackStatusMatch
+    ) {
       sendJson(response, 404, { ok: false, error: "Not found" });
       return;
     }
@@ -251,6 +285,28 @@ export function createBridgeServer({
       return;
     }
 
+    if (recommendation?.action === "list") {
+      if (!feedbackLoop) {
+        sendJson(response, 503, { ok: false, error: "Feedback service unavailable" });
+        return;
+      }
+      sendJson(response, 200, {
+        ok: true,
+        recommendations: feedbackLoop.listRecommendations(),
+      });
+      return;
+    }
+
+    if (recommendation?.action === "show") {
+      const record = feedbackLoop?.getRecommendation(recommendation.recommendationId);
+      if (!record) {
+        sendJson(response, 404, { ok: false, error: "Recommendation not found" });
+        return;
+      }
+      sendJson(response, 200, { ok: true, recommendation: record });
+      return;
+    }
+
     const client = request.socket.remoteAddress || "unknown";
     if (!allowRequest(client)) {
       sendJson(response, 429, { ok: false, error: "Rate limit exceeded" });
@@ -265,6 +321,59 @@ export function createBridgeServer({
       return;
     }
 
+    if (recommendation) {
+      if (!feedbackLoop) {
+        sendJson(response, 503, { ok: false, error: "Feedback service unavailable" });
+        return;
+      }
+      try {
+        let record;
+        if (recommendation.action === "approve") {
+          if (!body || typeof body !== "object" || Object.keys(body).length !== 0) {
+            throw new FeedbackLoopError("Approve body must be empty", "invalid_input");
+          }
+          record = await feedbackLoop.approve(recommendation.recommendationId);
+        } else if (recommendation.action === "reject") {
+          if (
+            !body ||
+            typeof body !== "object" ||
+            Object.keys(body).some((key) => key !== "reason")
+          ) {
+            throw new FeedbackLoopError("Reject body is invalid", "invalid_input");
+          }
+          record = await feedbackLoop.reject(recommendation.recommendationId, body.reason);
+        } else {
+          if (
+            !body ||
+            typeof body !== "object" ||
+            Object.keys(body).some((key) => !["version", "fixture_ids"].includes(key))
+          ) {
+            throw new FeedbackLoopError("Promote body is invalid", "invalid_input");
+          }
+          record = await feedbackLoop.recordPromotion(
+            recommendation.recommendationId,
+            body.version,
+            body.fixture_ids
+          );
+        }
+        logger.info({
+          recommendationId: record.recommendation_id,
+          state: record.state,
+          status: "recommendation_updated",
+        });
+        sendJson(response, 200, { ok: true, recommendation: record });
+      } catch (error) {
+        sendJson(response, feedbackErrorStatus(error), {
+          ok: false,
+          error:
+            error instanceof FeedbackLoopError
+              ? error.message
+              : "Invalid recommendation request",
+        });
+      }
+      return;
+    }
+
     const headerRequestId = request.headers["idempotency-key"]?.trim();
     const bodyRequestId = typeof body?.request_id === "string" ? body.request_id.trim() : "";
     if (headerRequestId && bodyRequestId && headerRequestId !== bodyRequestId) {
@@ -274,6 +383,40 @@ export function createBridgeServer({
     const requestId = headerRequestId || bodyRequestId;
     if (!requestId) {
       sendJson(response, 400, { ok: false, error: "Request ID required" });
+      return;
+    }
+
+    if (isFeedbackPost) {
+      if (!feedbackLoop) {
+        sendJson(response, 503, { ok: false, error: "Feedback service unavailable" });
+        return;
+      }
+      try {
+        const result = await feedbackLoop.recordOperatorFeedback({
+          ...body,
+          request_id: requestId,
+        });
+        logger.info({
+          feedbackId: result.feedback.feedback_id,
+          eventId: result.feedback.event_id,
+          category: result.feedback.category,
+          severity: result.feedback.severity,
+          status: "operator_feedback_recorded",
+          duplicate: result.duplicate,
+        });
+        sendJson(response, result.duplicate ? 200 : 201, {
+          ok: true,
+          feedbackId: result.feedback.feedback_id,
+          recommendationId: result.recommendation?.recommendation_id || null,
+          duplicate: result.duplicate,
+        });
+      } catch (error) {
+        sendJson(response, feedbackErrorStatus(error), {
+          ok: false,
+          error:
+            error instanceof FeedbackLoopError ? error.message : "Invalid feedback request",
+        });
+      }
       return;
     }
 

@@ -46,6 +46,7 @@ export function createEventProcessor({
   eventStore,
   evaluationJobStore,
   callbackStore = null,
+  feedbackLoop = null,
   analyticsClient = null,
   evaluate = evaluateDeterministically,
   clock = () => new Date(),
@@ -151,6 +152,7 @@ export function createEventProcessor({
         updated_at: now.toISOString(),
       });
     }
+    if (feedbackLoop) await feedbackLoop.recordEvaluation(current, deterministic);
     return eventStore.update(current.event_id, (value) => ({
       ...value,
       deterministic_evaluation: deterministic,
