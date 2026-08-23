@@ -12,9 +12,23 @@ const transcriptTurnSchema = z
   .strict();
 
 const transcriptSchema = z.array(transcriptTurnSchema).max(500);
+const messageSchema = z
+  .object({
+    turn_id: z.number().int().positive(),
+    role: z.enum(["assistant", "user"]),
+    content: z.string().trim().min(1).max(4000),
+    language_name: z.string().trim().min(1).max(80),
+  })
+  .strict();
 const responseSchema = z.union([
   transcriptSchema,
   z.object({ interaction_transcript: transcriptSchema }).strict(),
+  z
+    .object({
+      interaction_id: z.string().trim().min(1).max(240),
+      messages: z.array(messageSchema).max(500),
+    })
+    .strict(),
 ]);
 
 export class SarvamAnalyticsError extends Error {
@@ -80,7 +94,12 @@ export function createSarvamAnalyticsClient({
         });
       }
 
-      return Array.isArray(payload) ? payload : payload.interaction_transcript;
+      if (Array.isArray(payload)) return payload;
+      if ("interaction_transcript" in payload) return payload.interaction_transcript;
+      return payload.messages.map((message) => ({
+        role: message.role === "assistant" ? "agent" : "user",
+        en_text: message.content,
+      }));
     },
   });
 }

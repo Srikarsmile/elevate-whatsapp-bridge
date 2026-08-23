@@ -63,6 +63,35 @@ test("accepts a direct transcript array response", async () => {
   ]);
 });
 
+test("normalizes the current Sarvam messages transcript response", async () => {
+  const client = createSarvamAnalyticsClient({
+    config,
+    fetchImpl: async () =>
+      response(200, {
+        interaction_id: "20260823/interaction-123",
+        messages: [
+          {
+            turn_id: 1,
+            role: "assistant",
+            content: "Hello?",
+            language_name: "English",
+          },
+          {
+            turn_id: 2,
+            role: "user",
+            content: "Hello.",
+            language_name: "UNKNOWN",
+          },
+        ],
+      }),
+  });
+
+  assert.deepEqual(await client.getTranscript("20260823/interaction-123"), [
+    { role: "agent", en_text: "Hello?" },
+    { role: "user", en_text: "Hello." },
+  ]);
+});
+
 test("rejects malformed, oversized, and non-success responses", async () => {
   for (const result of [
     response(200, { interaction_transcript: [{ role: "system", en_text: "bad" }] }),
