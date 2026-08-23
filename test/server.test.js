@@ -66,6 +66,17 @@ async function postCallback(baseUrl, body, options = {}) {
   });
 }
 
+async function postSarvamTool(baseUrl, action, body, options = {}) {
+  return fetch(`${baseUrl}/v1/sarvam/tools/${action}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${options.secret ?? secret}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 async function postWebhook(baseUrl, route, body, token = webhookToken) {
   return fetch(`${baseUrl}/v1/sarvam/${route}/${encodeURIComponent(token)}`, {
     method: "POST",
@@ -485,6 +496,42 @@ test("rejects unauthorized callback booking and status lookup", async () => {
   });
 });
 
+test("accepts idempotent Sarvam tool actions without model-generated request IDs", async () => {
+  const options = baseOptions();
+  const { request_id: _messageRequestId, ...message } = validBody;
+  const { request_id: _callbackRequestId, confirmed_at: _confirmedAt, ...callback } =
+    validCallback;
+
+  await withServer(options, async (baseUrl) => {
+    const firstMessage = await postSarvamTool(baseUrl, "messages", message);
+    const duplicateMessage = await postSarvamTool(baseUrl, "messages", message);
+    assert.equal(firstMessage.status, 202);
+    assert.equal(duplicateMessage.status, 200);
+    assert.equal((await duplicateMessage.json()).duplicate, true);
+
+    const firstCallback = await postSarvamTool(baseUrl, "callbacks", callback);
+    const duplicateCallback = await postSarvamTool(baseUrl, "callbacks", callback);
+    assert.equal(firstCallback.status, 201);
+    assert.equal(duplicateCallback.status, 200);
+    assert.equal((await duplicateCallback.json()).duplicate, true);
+  });
+
+  assert.equal(options.calls.length, 1);
+  assert.equal(options.callbackStore.countPending(), 1);
+});
+
+test("keeps Sarvam tool actions behind bridge authentication", async () => {
+  const options = baseOptions();
+  const { request_id: _requestId, ...message } = validBody;
+  await withServer(options, async (baseUrl) => {
+    const response = await postSarvamTool(baseUrl, "messages", message, {
+      secret: "wrong",
+    });
+    assert.equal(response.status, 401);
+  });
+  assert.equal(options.calls.length, 0);
+});
+
 test("rejects an invalid or past callback time", async () => {
   const options = baseOptions();
   await withServer(options, async (baseUrl) => {
@@ -519,10 +566,27 @@ test("accepts a correlated Sarvam outbound event and persists it before callback
     const response = await postWebhook(
       baseUrl,
       "outbound-events",
-      outboundEvent(booking.booking_id)
+      outboundEvent(booking.booking_id, {
+        final_agent_variables: {
+          intent: "warm",
+          business_type: "speciality foods",
+          product_count: "about 40",
+          budget_range: "one lakh rupees",
+          launch_timeline: "six weeks",
+          required_features: "catalogue and online payments",
+        },
+      })
     );
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, duplicate: false });
+
+    const duplicate = await postWebhook(
+      baseUrl,
+      "outbound-events",
+      outboundEvent(booking.booking_id)
+    );
+    assert.equal(duplicate.status, 200);
+    assert.deepEqual(await duplicate.json(), { ok: true, duplicate: true });
   });
 
   const current = options.callbackStore.get(booking.booking_id);
@@ -534,6 +598,14 @@ test("accepts a correlated Sarvam outbound event and persists it before callback
     "transition:dialing",
     "transition:connected",
   ]);
+  assert.equal(options.calls.length, 1);
+  assert.equal(options.calls[0].to, "918688664337");
+  assert.match(options.calls[0].text, /Business: speciality foods/);
+  assert.match(options.calls[0].text, /Lead status: Warm/);
+  assert.deepEqual(
+    options.calls[0].attachments.map(({ kind }) => kind),
+    ["image", "document"]
+  );
   const event = options.callEventStore.list()[0];
   assert.equal(event.phone_last4, "4337");
   assert.doesNotMatch(JSON.stringify(event), /918688664337|test-webhook-token/);
@@ -569,6 +641,7 @@ test("maps Sarvam non-connected outcomes onto callback state", async () => {
       assert.equal(response.status, 200);
     });
     assert.equal(options.callbackStore.get(booking.booking_id).status, status);
+    assert.equal(options.calls.length, 0);
   }
 });
 

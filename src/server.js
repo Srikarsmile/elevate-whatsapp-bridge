@@ -130,6 +130,19 @@ function evaluationQueueErrorStatus(error) {
   return 400;
 }
 
+function sarvamToolRequestId(action, body) {
+  const normalized = Object.fromEntries(
+    Object.entries(body && typeof body === "object" ? body : {}).sort(([left], [right]) =>
+      left.localeCompare(right)
+    )
+  );
+  const digest = createHash("sha256")
+    .update(`${action}:${JSON.stringify(normalized)}`)
+    .digest("hex")
+    .slice(0, 24);
+  return `sarvam:${action}:${digest}`;
+}
+
 async function applyOutboundEvent(callbackStore, bookingId, event) {
   let booking = callbackStore.get(bookingId);
   if (booking.status === "dispatching") {
@@ -316,10 +329,11 @@ export function createBridgeServer({
 
       let event;
       let bookingId = null;
+      let booking = null;
       try {
         if (sarvamWebhook.kind === "outbound-events") {
           bookingId = body?.webhook_config?.metadata?.booking_id;
-          const booking = typeof bookingId === "string" ? callbackStore.get(bookingId) : null;
+          booking = typeof bookingId === "string" ? callbackStore.get(bookingId) : null;
           if (!booking) {
             sendJson(response, 404, { ok: false, error: "Callback booking not found" });
             return;
@@ -357,12 +371,13 @@ export function createBridgeServer({
         }
       }
 
-      if (sarvamWebhook.kind === "on-end" && event.status === "connected") {
+      if (event.status === "connected") {
         let postCallRequest;
         try {
           postCallRequest = buildPostCallMessageRequest({
             event,
-            recipientPhone: body.user_phone_number,
+            recipientPhone:
+              sarvamWebhook.kind === "on-end" ? body.user_phone_number : booking.to,
           });
           await deliverMessage(postCallRequest);
         } catch {
@@ -387,8 +402,16 @@ export function createBridgeServer({
       return;
     }
 
-    const isMessagePost = request.method === "POST" && url.pathname === "/v1/messages";
-    const isCallbackPost = request.method === "POST" && url.pathname === "/v1/callbacks";
+    const sarvamToolMatch =
+      request.method === "POST"
+        ? url.pathname.match(/^\/v1\/sarvam\/tools\/(messages|callbacks)$/)
+        : null;
+    const isMessagePost =
+      request.method === "POST" &&
+      (url.pathname === "/v1/messages" || sarvamToolMatch?.[1] === "messages");
+    const isCallbackPost =
+      request.method === "POST" &&
+      (url.pathname === "/v1/callbacks" || sarvamToolMatch?.[1] === "callbacks");
     const isFeedbackPost = request.method === "POST" && url.pathname === "/v1/feedback";
     const recommendation = recommendationRoute(request.method, url.pathname);
     const callbackStatusMatch =
@@ -522,7 +545,10 @@ export function createBridgeServer({
       sendJson(response, 409, { ok: false, error: "Conflicting request IDs" });
       return;
     }
-    const requestId = headerRequestId || bodyRequestId;
+    const requestId =
+      headerRequestId ||
+      bodyRequestId ||
+      (sarvamToolMatch ? sarvamToolRequestId(sarvamToolMatch[1], body) : "");
     if (!requestId) {
       sendJson(response, 400, { ok: false, error: "Request ID required" });
       return;

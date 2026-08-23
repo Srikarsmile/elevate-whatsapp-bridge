@@ -141,6 +141,10 @@ test("confirmed callback completes once through fake Sarvam and survives restart
     feedbackLoop,
     feedbackWorkerToken: workerToken,
     evaluationQueue,
+    architectureImagePath: "/private/architecture.png",
+    resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+    repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
+    implementationNote: "A short integration-test implementation note.",
     logger: logger(),
   });
   const bridgeUrl = await listen(bridge);

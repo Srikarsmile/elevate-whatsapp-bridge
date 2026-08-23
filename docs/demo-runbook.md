@@ -15,7 +15,7 @@
 3. A callback is created only after the caller gives a specific future time and confirms it.
 4. The callback scheduler claims the booking once and persists the claim before dispatch.
 5. Sarvam's outcome webhook supplies authoritative call status and transcript data.
-6. Hot leads receive the contextual mid-call WhatsApp follow-up. Every connected call triggers one idempotent post-call package with actual context, Srikar's number, the architecture image, resume, repository link, and implementation note.
+6. Hot leads receive the contextual mid-call WhatsApp follow-up. Every connected outbound result triggers one idempotent post-call package with actual context, Srikar's number, the architecture image, resume, repository link, and implementation note. The optional on-end hook is supported as a duplicate-safe fallback.
 
 ## Callback states
 

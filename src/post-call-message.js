@@ -30,7 +30,10 @@ function firstVariable(variables, aliases) {
 
 function classificationFrom(variables) {
   const value = boundedText(
-    variables?.intent_level ?? variables?.classification ?? variables?.lead_status
+    variables?.intent_level ??
+      variables?.intent ??
+      variables?.classification ??
+      variables?.lead_status
   )?.toLowerCase();
   if (value === "hot") return "Hot";
   if (value === "warm") return "Warm";

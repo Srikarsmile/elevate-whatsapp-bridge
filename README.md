@@ -6,6 +6,7 @@ This is the action layer for Srikar Reddy's ElevateBox SDE Intern assignment. Sa
 
 - Two-number allowlist: assignment reviewer and controlled test number
 - Idempotent mid-call and automatic post-call WhatsApp delivery
+- Sarvam-specific action routes with server-generated idempotency keys
 - Post-call context, mobile number, architecture image, resume, repository, and note
 - Confirmed callback booking with durable state and live Sarvam dispatch
 - Hot, Warm, and Cold intent evidence from structured agent variables
@@ -23,6 +24,8 @@ npm run check
 ```
 
 Load the environment values through your process manager, then run `npm start`. The service listens on loopback by default. See [docs/demo-runbook.md](docs/demo-runbook.md) for callback states, live-call gates, recovery, and assignment coverage.
+
+Sarvam's HTTP tools use `POST /v1/sarvam/tools/messages` and `POST /v1/sarvam/tools/callbacks` with the bridge bearer credential. These routes derive stable request IDs from their validated payloads so the voice model never has to generate operational identifiers.
 
 ## Architecture
 
