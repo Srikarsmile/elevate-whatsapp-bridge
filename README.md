@@ -31,6 +31,13 @@ Sarvam's HTTP tools use `POST /v1/sarvam/tools/messages` and `POST /v1/sarvam/to
 
 ![Voice agent architecture](assets/architecture.png)
 
+The diagram is rendered from the reviewable [Mermaid source](assets/architecture.mmd).
+Red diamonds are deliberate safety boundaries: live dispatch, preview publication,
+regression evidence, human approval, and manual promotion. The feedback worker can
+recommend a candidate version, but it cannot edit production or initiate delivery.
+An approved website build passes browser and review gates, deploys to Vercel through scoped
+credentials, and returns the live preview URL to the WhatsApp workflow.
+
 ## Implementation note
 
 What works: Sarvam calls, listens across Telugu, Hindi and English, qualifies the lead, and triggers authenticated Hermes actions during the conversation. Hot intent sends contextual WhatsApp before hang-up; confirmed callback times are stored durably; the final follow-up carries actual call context, my number, the architecture image, resume, and repository. Current limitation: WhatsApp uses a linked personal session for this experiment, so reconnection may occasionally be required. Next: replace that transport with Meta Cloud API and connect callbacks to production CRM and campaign orchestration.

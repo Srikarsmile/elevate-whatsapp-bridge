@@ -29,20 +29,27 @@ test("nginx route keeps the bridge local, bounded and rate limited", async () =>
   assert.match(location, /location \^~ \/elevate-whatsapp\/v1\/internal\/ \{\s*return 404;/);
 });
 
-test("architecture source documents the implemented flow and contact number", async () => {
-  const html = await read("assets/architecture.html");
-  assert.match(html, /Sarvam Voice Agent/);
-  assert.match(html, /Callback Scheduler/);
-  assert.match(html, /Instant Outbound/);
-  assert.match(html, /Deterministic Evaluator/);
-  assert.match(html, /Tool-free Hermes/);
-  assert.match(html, /Human Approval/);
-  assert.match(html, /Regression Cases/);
-  assert.match(html, /WhatsApp/);
-  assert.match(html, /resume/);
-  assert.match(html, /repository/);
-  assert.match(html, /\+91 86398 85985/);
-  assert.doesNotMatch(html, /Priya/);
+test("Mermaid architecture documents runtime, preview, and self-improvement gates", async () => {
+  const diagram = await read("assets/architecture.mmd");
+  assert.match(diagram, /^flowchart LR/m);
+  assert.match(diagram, /Sarvam Voice Agent/);
+  assert.match(diagram, /Callback Scheduler/);
+  assert.match(diagram, /Instant Outbound/);
+  assert.match(diagram, /Website Preview Builder/);
+  assert.match(diagram, /Vercel Deployment/);
+  assert.match(diagram, /Live Preview URL/);
+  assert.match(diagram, /Deterministic Evaluator/);
+  assert.match(diagram, /Tool-free Hermes/);
+  assert.match(diagram, /Regression Evidence Gate/);
+  assert.match(diagram, /Human Approval Gate/);
+  assert.match(diagram, /Manual Promotion Gate/);
+  assert.match(diagram, /No Direct Self-Edit/);
+  assert.match(diagram, /External Deployment Gate/);
+  assert.match(diagram, /WhatsApp/);
+  assert.match(diagram, /resume/);
+  assert.match(diagram, /repository/);
+  assert.match(diagram, /\+91 86398 85985/);
+  assert.doesNotMatch(diagram, /Priya/);
 });
 
 test("systemd pins every bridge state path and defaults callback dispatch to disabled", async () => {

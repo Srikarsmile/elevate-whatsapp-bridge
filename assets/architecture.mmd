@@ -1,0 +1,102 @@
+%%{init: {"theme":"base","themeVariables":{"background":"#f6f7f5","fontFamily":"Inter, ui-sans-serif, system-ui, sans-serif","primaryTextColor":"#172126","lineColor":"#657176","clusterBkg":"#ffffff","clusterBorder":"#bfc9c7"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":32,"rankSpacing":38}}}%%
+flowchart LR
+  subgraph runtime["1 - LIVE CALL  |"]
+    direction TB
+    lead(["Lead / reviewer"])
+    voice["Sarvam Voice Agent<br/>Telugu / Hindi / English<br/>interruptions + intent"]
+    bridge["Authenticated Hermes Bridge<br/>consent + allowlist + idempotency"]
+    whatsapp["WhatsApp<br/>mid-call on high intent<br/>post-call: context + resume + number<br/>repository + architecture"]
+    booking["Durable Callback Store<br/>confirmed time + caller context"]
+    scheduler["Callback Scheduler<br/>claim first; quarantine unknowns"]
+    dispatchGate{"Live Dispatch Gate<br/>disabled -> dry_run -> live"}
+    outbound["Sarvam Instant Outbound<br/>one idempotent call request"]
+    hold["Hold / dry run<br/>no call"]
+    webhook["Signed Outcome Webhook<br/>provider truth"]
+
+    lead <-->|"natural conversation"| voice
+    voice -->|"signed tool request"| bridge
+    bridge -->|"high intent while call is live"| whatsapp
+    bridge -->|"explicit callback consent"| booking
+    booking --> scheduler --> dispatchGate
+    dispatchGate -->|"operator enabled"| outbound --> lead
+    dispatchGate -->|"default"| hold
+    voice -. "call outcome" .-> webhook
+    outbound -. "callback outcome" .-> webhook
+  end
+
+  subgraph preview["2 - BUILD + VERCEL  |"]
+    direction TB
+    previewBrief["INPUT<br/>approved lead context<br/>bounded preview brief"]
+    previewApproval{"Preview Approval Gate<br/>explicit human decision"}
+    queue["Durable Build Queue<br/>one idempotent job"]
+    builder["Hermes Website Preview Builder<br/>GPT-5.6 Sol; isolated runtime"]
+    browserGates["Deterministic + Browser Gates<br/>desktop / mobile / Axe / Lighthouse"]
+    finalReview["Sol Final Review<br/>evidence-bound structured verdict"]
+    handoff["Immutable Deploy Handoff<br/>artifact + evidence digests"]
+    deliveryGate{"External Deployment Gate<br/>approval + scoped credentials"}
+    vercel["Vercel Deployment<br/>approved artifact only"]
+    previewUrl["Live Preview URL<br/>returned to lead workflow"]
+    localArtifact["Audited Local Artifact<br/>disabled or failed deploy<br/>nothing published"]
+
+    previewBrief --> previewApproval
+    previewApproval -->|"approved"| queue --> builder --> browserGates --> finalReview --> handoff --> deliveryGate
+    previewApproval -->|"rejected"| localArtifact
+    deliveryGate -->|"disabled / failed"| localArtifact
+    deliveryGate -->|"approved"| vercel --> previewUrl
+  end
+
+  subgraph improvement["3 - IMPROVEMENT GATES  |"]
+    direction TB
+    eventStore["INPUT<br/>redacted signed outcomes<br/>idempotent + 30-day retention"]
+    evaluator["Deterministic Evaluator<br/>listening + turns + facts + consent<br/>callback + delivery honesty"]
+    hermes["Tool-free Hermes Review<br/>fixed rubric<br/>no shell, network, or bridge tools"]
+    cases["Regression Cases<br/>evidence from distinct calls"]
+    evidenceGate{"Regression Evidence Gate<br/>numeric threshold + reproducible failures"}
+    recommendation["Candidate Recommendation<br/>versioned prompt / policy diff"]
+    humanGate{"Human Approval Gate<br/>review or reject"}
+    promotionGate{"Manual Promotion Gate<br/>operator-controlled rollout"}
+    approvedVersion["OUTPUT<br/>Approved Agent Version<br/>audited rollback point"]
+    backlog["Evidence Backlog<br/>collect more calls<br/>no production change"]
+    protected["Protected Production Boundary<br/>No Direct Self-Edit<br/>prompts + credentials + live dispatch<br/>WhatsApp delivery remain controlled"]
+
+    eventStore --> evaluator --> hermes --> cases --> evidenceGate
+    evidenceGate -->|"insufficient"| backlog
+    evidenceGate -->|"sufficient"| recommendation --> humanGate
+    humanGate -->|"rejected"| backlog
+    humanGate -->|"approved"| promotionGate
+    promotionGate -->|"not promoted"| backlog
+    promotionGate -->|"operator promotes"| approvedVersion
+    hermes -. "recommendations only" .-> protected
+    protected -. "requires both approval gates" .-> promotionGate
+  end
+
+  subgraph notes["4 - INFO"]
+    direction TB
+    handoffs["1 -> 2<br/>Operator submits approved lead context<br/><br/>2 -> 1<br/>Live Vercel URL returns for WhatsApp<br/><br/>1 -> 3<br/>Signed outcomes become redacted evidence<br/><br/>3 -> 1<br/>Operator applies an approved version"]
+    contact["Srikar Reddy<br/>WhatsApp / text<br/>+91 86398 85985"]
+    legend["Solid = automatic + idempotent<br/>Dashed = optional / controlled<br/>Red diamond = mandatory gate"]
+    rule["SELF-IMPROVEMENT RULE<br/>Evidence may propose.<br/>Humans approve.<br/>Only operators promote."]
+    handoffs --> contact --> legend --> rule
+  end
+
+  runtime -. "approved context" .-> preview
+  preview -. "validated evidence" .-> improvement
+  improvement -. "operator control" .-> notes
+
+  classDef voice fill:#dcefeb,stroke:#2d6480,stroke-width:2px,color:#172126;
+  classDef action fill:#e3efe5,stroke:#36794a,stroke-width:2px,color:#172126;
+  classDef data fill:#f4f6f3,stroke:#7c898d,stroke-width:1.5px,color:#172126;
+  classDef evaluate fill:#f5ebce,stroke:#9b6a0d,stroke-width:2px,color:#172126;
+  classDef gate fill:#fae6e1,stroke:#c94f3d,stroke-width:3px,color:#172126;
+  classDef protected fill:#fff1ed,stroke:#a8382a,stroke-width:3px,color:#172126;
+  classDef output fill:#dcefeb,stroke:#087f70,stroke-width:2px,color:#172126;
+  classDef note fill:#ffffff,stroke:#bfc9c7,stroke-width:1px,color:#465257;
+
+  class voice,outbound voice;
+  class bridge,whatsapp,scheduler action;
+  class booking,webhook,queue,handoff,eventStore,cases,backlog data;
+  class builder,browserGates,finalReview,evaluator,hermes,recommendation evaluate;
+  class dispatchGate,previewApproval,deliveryGate,evidenceGate,humanGate,promotionGate gate;
+  class protected protected;
+  class localArtifact,vercel,previewUrl,approvedVersion output;
+  class lead,hold,previewBrief,handoffs,contact,legend,rule note;
