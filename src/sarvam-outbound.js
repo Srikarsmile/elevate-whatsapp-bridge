@@ -49,6 +49,9 @@ export function createSarvamOutboundClient({
   timeoutMs = 8000,
 }) {
   return Object.freeze({
+    preview(booking) {
+      return buildOutboundPayload(booking, config);
+    },
     async createCall(booking) {
       const payload = buildOutboundPayload(booking, config);
       const url = `${baseUrl.replace(/\/+$/, "")}/orgs/${encodeURIComponent(

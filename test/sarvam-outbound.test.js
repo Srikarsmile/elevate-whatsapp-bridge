@@ -87,6 +87,20 @@ test("sends one authenticated request and returns the attempt ID", async () => {
   assert.ok(calls[0].options.signal);
 });
 
+test("previews a validated payload without sending a request", () => {
+  let calls = 0;
+  const client = createSarvamOutboundClient({
+    config,
+    fetchImpl: async () => {
+      calls += 1;
+      return response(200, { attempt_id: "attempt-test-1" });
+    },
+  });
+
+  assert.deepEqual(client.preview(booking), buildOutboundPayload(booking, config));
+  assert.equal(calls, 0);
+});
+
 test("rechecks the recipient allowlist before any fetch", async () => {
   let calls = 0;
   const client = createSarvamOutboundClient({
