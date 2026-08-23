@@ -1,0 +1,24 @@
+{
+  "event": {
+    "transcript": null,
+    "attempt_id": null,
+    "final_agent_variables": {
+      "business": "fictional bakery",
+      "products": "cakes",
+      "features": "orders",
+      "budget": "not set",
+      "timeline": "this month",
+      "decision_maker": "manager",
+      "intent": "hot"
+    },
+    "tool_results": [{ "name": "schedule_callback", "status": "success", "booking_id": "cb-1111111111111111" }],
+    "received_at": "2026-08-23T05:10:00.000Z"
+  },
+  "callback": {
+    "status": "scheduled",
+    "dispatch_mode": "live",
+    "callback_time_iso": "2026-08-23T05:00:00.000Z",
+    "attempt_id": null
+  },
+  "expected": { "finding_codes": ["due_callback_not_dispatched"], "score": 50, "interruption": "not_scoreable" }
+}

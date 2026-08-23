@@ -1,0 +1,23 @@
+{
+  "event": {
+    "transcript": [
+      { "role": "agent", "en_text": "What does your fictional shop sell?" },
+      { "role": "user", "en_text": "Handmade notebooks and desk accessories." },
+      { "role": "agent", "en_text": "Which improvement matters most?" },
+      { "role": "user", "en_text": "A simpler catalogue and checkout." }
+    ],
+    "final_agent_variables": {
+      "business": "fictional stationery",
+      "products": "notebooks",
+      "features": "catalogue and checkout",
+      "budget": "not set",
+      "timeline": "next month",
+      "decision_maker": "owner",
+      "intent": "warm"
+    },
+    "tool_results": [],
+    "received_at": "2026-08-23T05:00:00.000Z"
+  },
+  "callback": null,
+  "expected": { "finding_codes": [], "score": 100, "interruption": "not_scoreable" }
+}

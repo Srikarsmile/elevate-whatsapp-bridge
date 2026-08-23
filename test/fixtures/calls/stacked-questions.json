@@ -1,0 +1,21 @@
+{
+  "event": {
+    "transcript": [
+      { "role": "agent", "en_text": "What do you sell? Who buys it? What is the budget?" },
+      { "role": "user", "en_text": "A fictional subscription service for local clubs." }
+    ],
+    "final_agent_variables": {
+      "business": "fictional subscriptions",
+      "products": "memberships",
+      "features": "payments",
+      "budget": "unknown",
+      "timeline": "quarter",
+      "decision_maker": "founder",
+      "intent": "warm"
+    },
+    "tool_results": [],
+    "received_at": "2026-08-23T05:00:00.000Z"
+  },
+  "callback": null,
+  "expected": { "finding_codes": ["stacked_questions"], "score": 90, "interruption": "not_scoreable" }
+}

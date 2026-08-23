@@ -1,0 +1,22 @@
+{
+  "event": {
+    "transcript": [
+      { "role": "agent", "en_text": "I can arrange that." },
+      { "role": "user", "en_text": "Please do." }
+    ],
+    "final_agent_variables": {
+      "business": "fictional florist",
+      "products": "flowers",
+      "features": "delivery",
+      "budget": "not set",
+      "timeline": "this week",
+      "decision_maker": "owner",
+      "intent": "hot",
+      "callback_requested": true
+    },
+    "tool_results": [],
+    "received_at": "2026-08-23T05:00:00.000Z"
+  },
+  "callback": null,
+  "expected": { "finding_codes": ["callback_not_booked"], "score": 60, "interruption": "not_scoreable" }
+}

@@ -1,0 +1,22 @@
+{
+  "event": {
+    "transcript": [
+      { "role": "agent", "en_text": "Let me explain the next step." },
+      { "role": "agent", "en_text": "First I need one detail." },
+      { "role": "user", "en_text": "Go ahead." }
+    ],
+    "final_agent_variables": {
+      "business": "fictional repair shop",
+      "products": "repairs",
+      "features": "quotes",
+      "budget": "unknown",
+      "timeline": "month",
+      "decision_maker": "manager",
+      "intent": "warm"
+    },
+    "tool_results": [],
+    "received_at": "2026-08-23T05:00:00.000Z"
+  },
+  "callback": null,
+  "expected": { "finding_codes": ["consecutive_agent_turns"], "score": 85, "interruption": "not_scoreable" }
+}

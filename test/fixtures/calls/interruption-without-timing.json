@@ -1,0 +1,21 @@
+{
+  "event": {
+    "transcript": [
+      { "role": "agent", "en_text": "Tell me about the fictional service." },
+      { "role": "user", "en_text": "It helps residents find local classes." }
+    ],
+    "final_agent_variables": {
+      "business": "fictional directory",
+      "products": "listings",
+      "features": "search",
+      "budget": "unknown",
+      "timeline": "quarter",
+      "decision_maker": "founder",
+      "intent": "warm"
+    },
+    "tool_results": [],
+    "received_at": "2026-08-23T05:00:00.000Z"
+  },
+  "callback": null,
+  "expected": { "finding_codes": [], "score": 100, "interruption": "not_scoreable" }
+}

@@ -1,0 +1,21 @@
+{
+  "event": {
+    "transcript": [
+      { "role": "agent", "en_text": "I understand. I understand." },
+      { "role": "user", "en_text": "The fictional studio needs a booking page." }
+    ],
+    "final_agent_variables": {
+      "business": "fictional studio",
+      "products": "classes",
+      "features": "bookings",
+      "budget": "unknown",
+      "timeline": "month",
+      "decision_maker": "owner",
+      "intent": "warm"
+    },
+    "tool_results": [],
+    "received_at": "2026-08-23T05:00:00.000Z"
+  },
+  "callback": null,
+  "expected": { "finding_codes": ["repeated_sentence"], "score": 90, "interruption": "not_scoreable" }
+}
