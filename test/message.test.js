@@ -75,6 +75,21 @@ test("formats captured facts and always includes Srikar's contact number", () =>
   assert.deepEqual(result.attachments, []);
 });
 
+test("uses the caller language and quotes their exact words", () => {
+  const request = parseMessageRequest({
+    ...validMidCall,
+    language: "Telugu-English mixed",
+    quote: "పండుగకు ముందు launch చేయాలి",
+  });
+
+  const result = formatMessage(request);
+
+  assert.match(result.text, /మీతో మాట్లాడినందుకు ధన్యవాదాలు/);
+  assert.match(result.text, /మీరు చెప్పింది: “పండుగకు ముందు launch చేయాలి”/);
+  assert.match(result.text, /లీడ్ స్థితి: Hot/);
+  assert.match(result.text, /\+918639885985/);
+});
+
 test("adds the required assignment artifacts and repository to a post-call follow-up", () => {
   const request = parseMessageRequest({
     request_id: "call-789:post-call",

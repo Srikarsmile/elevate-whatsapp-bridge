@@ -7,6 +7,7 @@ const FIELD_ALIASES = Object.freeze({
   timeline: ["timeline", "launch_timeline"],
   features: ["features", "required_features"],
   summary: ["follow_up_summary", "summary", "context_summary", "intent_reasons"],
+  language: ["detected_language", "language", "language_name"],
 });
 
 function boundedText(value) {
@@ -49,6 +50,15 @@ function transcriptSummary(transcript) {
   return boundedText(userTurns.slice(-3).join(" "));
 }
 
+function transcriptQuote(transcript) {
+  if (!Array.isArray(transcript)) return undefined;
+  return transcript
+    .filter((turn) => turn?.role === "user")
+    .map((turn) => boundedText(turn.en_text))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)[0];
+}
+
 export function buildPostCallMessageRequest({ event, recipientPhone }) {
   const variables = event.final_agent_variables || {};
   const facts = Object.fromEntries(
@@ -57,6 +67,7 @@ export function buildPostCallMessageRequest({ event, recipientPhone }) {
       .filter(([, value]) => value)
   );
   if (!facts.summary) facts.summary = transcriptSummary(event.transcript);
+  const quote = transcriptQuote(event.transcript);
 
   return parseMessageRequest({
     request_id: `post-call:${event.event_id}`,
@@ -64,5 +75,6 @@ export function buildPostCallMessageRequest({ event, recipientPhone }) {
     stage: "post_call",
     classification: classificationFrom(variables),
     ...facts,
+    ...(quote ? { quote } : {}),
   });
 }
