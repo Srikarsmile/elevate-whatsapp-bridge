@@ -96,6 +96,7 @@ export function parseHermesEvaluation(value, transcriptLength) {
 export function createEvaluationQueue({
   store,
   eventStore = null,
+  feedbackLoop = null,
   clock = () => new Date(),
   leaseMs = 2 * 60 * 1000,
   randomToken = () => randomBytes(32).toString("hex"),
@@ -139,12 +140,13 @@ export function createEvaluationQueue({
     if (!eventStore) return;
     const event = eventStore.get(job.event_id);
     if (!event) return;
-    await eventStore.update(job.event_id, (value) => ({
+    const updated = await eventStore.update(job.event_id, (value) => ({
       ...value,
       hermes_evaluation: result,
       llm_status: "complete",
       llm_evaluated_at: now.toISOString(),
     }));
+    if (feedbackLoop) await feedbackLoop.recordHermesEvaluation(updated, result);
   }
 
   async function complete({ jobId, leaseToken, result, errorCode }) {

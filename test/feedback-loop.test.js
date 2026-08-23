@@ -163,6 +163,35 @@ test("turns a low deterministic evaluation into numeric regression evidence", as
   assert.doesNotMatch(JSON.stringify(values.caseStore.list()), /question_count/);
 });
 
+test("groups adequate low Hermes scores but ignores insufficient evidence", async () => {
+  const events = [callEvent("interaction-hermes-a"), callEvent("interaction-hermes-b")];
+  const { loop } = service(stores(events));
+  const low = {
+    scores: {
+      listening: 82,
+      concision: 91,
+      naturalness: 90,
+      intent_accuracy: 92,
+      task_completion: 91,
+    },
+    evidence: [{ turn_indexes: [0], failure_code: "stacked_questions" }],
+    failures: ["stacked_questions"],
+    prompt_delta: "Ask one question.",
+    confidence: 0.8,
+    insufficient_evidence: false,
+  };
+  const first = await loop.recordHermesEvaluation(events[0], low);
+  assert.equal(first.recommendation, null);
+  const second = await loop.recordHermesEvaluation(events[1], low);
+  assert.equal(second.recommendation.category, "stacked_questions");
+
+  const ignored = await loop.recordHermesEvaluation(events[0], {
+    ...low,
+    insufficient_evidence: true,
+  });
+  assert.equal(ignored.caseRecord, null);
+});
+
 test("approval, rejection, and promotion only mutate recommendation state", async () => {
   const { loop } = service();
   const { recommendation } = await loop.recordOperatorFeedback(criticalFeedback);

@@ -141,6 +141,31 @@ test("completes a matching lease idempotently and updates the event", async () =
   assert.equal(eventStore.get(job().event_id).llm_status, "complete");
 });
 
+test("forwards completed Hermes output to governed feedback processing", async () => {
+  const store = memoryStore("job_id", [job()]);
+  const call = { event_id: job().event_id, llm_status: "pending" };
+  const eventStore = memoryStore("event_id", [call]);
+  const recorded = [];
+  const queue = createEvaluationQueue({
+    store,
+    eventStore,
+    feedbackLoop: {
+      recordHermesEvaluation: async (event, evaluation) =>
+        recorded.push({ event, evaluation }),
+    },
+    randomToken: () => "lease-token-with-at-least-32-characters",
+  });
+  const claimed = await queue.claim();
+  await queue.complete({
+    jobId: claimed.job_id,
+    leaseToken: claimed.lease_token,
+    result: validResult,
+  });
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].event.event_id, call.event_id);
+  assert.deepEqual(recorded[0].evaluation, validResult);
+});
+
 test("returns failed work to pending with bounded exponential delay", async () => {
   let now = new Date("2026-08-23T05:00:00.000Z");
   const store = memoryStore("job_id", [job({ attempts: 7 })]);

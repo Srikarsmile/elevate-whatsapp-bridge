@@ -234,6 +234,51 @@ export function createFeedbackLoop({
     return { caseRecord, recommendation, duplicate };
   }
 
+  async function recordHermesEvaluation(event, evaluation) {
+    if (!event || !evaluation || !evaluation.scores) {
+      throw new FeedbackLoopError("Hermes evaluation input is invalid", "invalid_input");
+    }
+    if (evaluation.insufficient_evidence) {
+      return { caseRecord: null, recommendation: null, duplicate: false };
+    }
+    const scores = Object.values(evaluation.scores);
+    if (scores.length !== 5 || scores.some((score) => !Number.isFinite(score))) {
+      throw new FeedbackLoopError("Hermes scores are invalid", "invalid_input");
+    }
+    const lowestScore = Math.min(...scores);
+    if (lowestScore >= 85) {
+      return { caseRecord: null, recommendation: null, duplicate: false };
+    }
+    const findings = (Array.isArray(evaluation.evidence) ? evaluation.evidence : []).map(
+      (item) => ({
+        code: item.failure_code,
+        turn_indexes: item.turn_indexes,
+      })
+    );
+    if (findings.length === 0) {
+      findings.push(
+        ...(Array.isArray(evaluation.failures)
+          ? evaluation.failures.map((code) => ({ code, turn_indexes: [] }))
+          : [])
+      );
+    }
+    const category = categoryForFindings(findings);
+    const reliability = reliabilityCategories.has(category);
+    const severity = reliability ? "critical" : lowestScore < 60 ? "high" : "medium";
+    const sourceId = `hermes:${event.event_id}`;
+    const caseId = stableId("case", sourceId);
+    const duplicate = Boolean(caseStore.get(caseId));
+    const caseRecord = await persistCase({
+      sourceId,
+      event,
+      category,
+      severity,
+      findings,
+    });
+    const recommendation = await ensureRecommendation(category, reliability);
+    return { caseRecord, recommendation, duplicate };
+  }
+
   function getRecommendation(recommendationId) {
     return recommendationStore.get(recommendationId) || null;
   }
@@ -288,6 +333,7 @@ export function createFeedbackLoop({
   return Object.freeze({
     recordOperatorFeedback,
     recordEvaluation,
+    recordHermesEvaluation,
     listRecommendations,
     getRecommendation,
     approve,
