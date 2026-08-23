@@ -3,6 +3,7 @@ import http from "node:http";
 
 import { parseOnEndEvent, parseOutboundEvent } from "./call-event.js";
 import { parseCallbackRequest } from "./callback.js";
+import { EvaluationQueueError } from "./evaluation-queue.js";
 import { FeedbackLoopError } from "./feedback-loop.js";
 import { formatMessage, parseMessageRequest } from "./message.js";
 
@@ -117,6 +118,17 @@ function recommendationRoute(method, pathname) {
   return null;
 }
 
+function isLoopbackAddress(value) {
+  return value === "127.0.0.1" || value === "::1" || value === "::ffff:127.0.0.1";
+}
+
+function evaluationQueueErrorStatus(error) {
+  if (!(error instanceof EvaluationQueueError)) return 400;
+  if (error.code === "not_found") return 404;
+  if (error.code === "lease_mismatch") return 409;
+  return 400;
+}
+
 async function applyOutboundEvent(callbackStore, bookingId, event) {
   let booking = callbackStore.get(bookingId);
   if (booking.status === "dispatching") {
@@ -145,6 +157,8 @@ export function createBridgeServer({
   phoneHashSalt = null,
   healthStatus = null,
   feedbackLoop = null,
+  feedbackWorkerToken = null,
+  evaluationQueue = null,
   architectureImagePath = null,
   resumePath = null,
   implementationNote = null,
@@ -161,6 +175,12 @@ export function createBridgeServer({
   if (webhookToken && (!callEventStore || !phoneHashSalt)) {
     throw new Error("Sarvam webhook storage and phone hash salt are required");
   }
+  if (feedbackWorkerToken && feedbackWorkerToken.length < 24) {
+    throw new Error("Feedback worker token must be at least 24 characters");
+  }
+  if (feedbackWorkerToken && !evaluationQueue) {
+    throw new Error("Evaluation queue is required for the feedback worker");
+  }
   const allowRequest = createRateLimiter(rateLimit);
   const inFlight = new Map();
 
@@ -174,6 +194,76 @@ export function createBridgeServer({
         whatsapp,
         ...(healthStatus ? healthStatus() : {}),
       });
+      return;
+    }
+
+    const internalEvaluationMatch =
+      request.method === "POST"
+        ? url.pathname.match(/^\/v1\/internal\/evaluations\/(claim|complete)$/)
+        : null;
+    if (internalEvaluationMatch) {
+      if (!feedbackWorkerToken || !isLoopbackAddress(request.socket.remoteAddress)) {
+        sendJson(response, 404, { ok: false, error: "Not found" });
+        return;
+      }
+      if (!secureEqual(bearerToken(request), feedbackWorkerToken)) {
+        sendJson(response, 401, { ok: false, error: "Unauthorized" });
+        return;
+      }
+      let body;
+      try {
+        body = await readJson(request, bodyLimitBytes);
+      } catch (error) {
+        sendJson(response, error.statusCode || 400, { ok: false, error: error.message });
+        return;
+      }
+      try {
+        if (internalEvaluationMatch[1] === "claim") {
+          if (!body || typeof body !== "object" || Object.keys(body).length !== 0) {
+            throw new EvaluationQueueError("Claim body must be empty", "invalid_input");
+          }
+          const job = await evaluationQueue.claim();
+          if (job) {
+            logger.info({ jobId: job.job_id, status: "evaluation_leased" });
+          }
+          sendJson(response, 200, { ok: true, job });
+          return;
+        }
+
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Object.keys(body).some(
+            (key) => !["job_id", "lease_token", "result", "error_code"].includes(key)
+          )
+        ) {
+          throw new EvaluationQueueError("Completion body is invalid", "invalid_input");
+        }
+        const completed = await evaluationQueue.complete({
+          jobId: body.job_id,
+          leaseToken: body.lease_token,
+          ...(body.result === undefined ? {} : { result: body.result }),
+          ...(body.error_code === undefined ? {} : { errorCode: body.error_code }),
+        });
+        logger.info({
+          jobId: completed.job.job_id,
+          status: `evaluation_${completed.job.status}`,
+          duplicate: completed.duplicate,
+        });
+        sendJson(response, 200, {
+          ok: true,
+          status: completed.job.status,
+          duplicate: completed.duplicate,
+        });
+      } catch (error) {
+        sendJson(response, evaluationQueueErrorStatus(error), {
+          ok: false,
+          error:
+            error instanceof EvaluationQueueError
+              ? error.message
+              : "Invalid evaluation worker request",
+        });
+      }
       return;
     }
 

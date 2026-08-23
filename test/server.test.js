@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createEvaluationQueue } from "../src/evaluation-queue.js";
 import { createFeedbackLoop } from "../src/feedback-loop.js";
 import { createBridgeServer } from "../src/server.js";
 
 const secret = "test-bridge-secret-with-enough-entropy";
 const webhookToken = "test-webhook-token-with-enough-entropy";
 const phoneHashSalt = "test-phone-hash-salt-with-enough-entropy";
+const feedbackWorkerToken = "test-feedback-worker-token-with-enough-entropy";
 const validBody = {
   request_id: "call-123:mid-call",
   to: "918688664337",
@@ -83,6 +85,17 @@ async function operatorRequest(baseUrl, path, { method = "GET", body, token = se
   });
 }
 
+async function workerRequest(baseUrl, action, body = {}, token = feedbackWorkerToken) {
+  return fetch(`${baseUrl}/v1/internal/evaluations/${action}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 function createMemoryCallbackStore() {
   const byId = new Map();
   const byRequestId = new Map();
@@ -133,6 +146,13 @@ function createMemoryCallEventStore(operationOrder = []) {
       values.set(value.event_id, value);
       return { record: value, duplicate: false };
     },
+    async update(id, updater) {
+      const current = values.get(id);
+      if (!current) throw new Error("not found");
+      const next = Object.freeze({ ...updater(current) });
+      values.set(id, next);
+      return next;
+    },
   };
 }
 
@@ -169,6 +189,11 @@ function baseOptions(overrides = {}) {
   const feedbackStore = createMemoryRecordStore("feedback_id");
   const caseStore = createMemoryRecordStore("case_id");
   const recommendationStore = createMemoryRecordStore("recommendation_id");
+  const evaluationJobStore = createMemoryRecordStore("job_id");
+  const evaluationQueue = createEvaluationQueue({
+    store: evaluationJobStore,
+    eventStore: callEventStore,
+  });
   const feedbackLoop = createFeedbackLoop({
     eventStore: callEventStore,
     feedbackStore,
@@ -191,6 +216,8 @@ function baseOptions(overrides = {}) {
     webhookToken,
     phoneHashSalt,
     feedbackLoop,
+    feedbackWorkerToken,
+    evaluationQueue,
     healthStatus: () => ({
       callbackScheduler: "disabled",
       callbackDispatchMode: "disabled",
@@ -208,6 +235,7 @@ function baseOptions(overrides = {}) {
     feedbackStore,
     caseStore,
     recommendationStore,
+    evaluationJobStore,
     ...overrides,
   };
 }
@@ -725,5 +753,125 @@ test("returns not found for an unknown recommendation", async () => {
       "/v1/recommendations/rec-ffffffffffffffffffffffff"
     );
     assert.equal(response.status, 404);
+  });
+});
+
+async function seedEvaluationJob(options) {
+  const call = {
+    event_id: "evt-worker1111111111111111111",
+    interaction_id: "interaction-worker-1",
+    app_version: 7,
+    llm_status: "pending",
+    evaluation_status: "deterministic_complete",
+  };
+  await options.callEventStore.put(call);
+  await options.evaluationJobStore.put({
+    job_id: "job-worker1111111111111111111",
+    event_id: call.event_id,
+    interaction_id: call.interaction_id,
+    app_version: 7,
+    transcript: [
+      { role: "agent", en_text: "What is the main goal?" },
+      { role: "user", en_text: "A clearer fictional catalogue." },
+    ],
+    deterministic_evaluation: { score: 90, findings: [] },
+    status: "pending",
+    attempts: 0,
+    next_attempt_at: new Date(Date.now() - 1000).toISOString(),
+    created_at: new Date(Date.now() - 1000).toISOString(),
+    updated_at: new Date(Date.now() - 1000).toISOString(),
+  });
+  return call;
+}
+
+const hermesResult = {
+  scores: {
+    listening: 91,
+    concision: 88,
+    naturalness: 86,
+    intent_accuracy: 92,
+    task_completion: 90,
+  },
+  evidence: [{ turn_indexes: [0], failure_code: "stacked_questions" }],
+  failures: ["stacked_questions"],
+  prompt_delta: "Ask one question, then wait for the answer.",
+  confidence: 0.83,
+  insufficient_evidence: false,
+};
+
+test("leases one evaluation job through the loopback worker API", async () => {
+  const options = baseOptions();
+  await seedEvaluationJob(options);
+  await withServer(options, async (baseUrl) => {
+    const claimed = await workerRequest(baseUrl, "claim");
+    assert.equal(claimed.status, 200);
+    const body = await claimed.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.job.job_id, "job-worker1111111111111111111");
+    assert.ok(body.job.lease_token);
+    assert.equal(options.evaluationJobStore.get(body.job.job_id).status, "leased");
+
+    const empty = await workerRequest(baseUrl, "claim");
+    assert.equal(empty.status, 200);
+    assert.deepEqual(await empty.json(), { ok: true, job: null });
+  });
+});
+
+test("completes a worker lease idempotently with strict Hermes output", async () => {
+  const options = baseOptions();
+  const call = await seedEvaluationJob(options);
+  await withServer(options, async (baseUrl) => {
+    const claimed = (await (await workerRequest(baseUrl, "claim")).json()).job;
+    const completion = {
+      job_id: claimed.job_id,
+      lease_token: claimed.lease_token,
+      result: hermesResult,
+    };
+    const first = await workerRequest(baseUrl, "complete", completion);
+    const duplicate = await workerRequest(baseUrl, "complete", completion);
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), {
+      ok: true,
+      status: "complete",
+      duplicate: false,
+    });
+    assert.equal(duplicate.status, 200);
+    assert.equal((await duplicate.json()).duplicate, true);
+  });
+  assert.equal(options.callEventStore.get(call.event_id).llm_status, "complete");
+  assert.deepEqual(options.callEventStore.get(call.event_id).hermes_evaluation, hermesResult);
+});
+
+test("returns worker failures to pending without accepting arbitrary error text", async () => {
+  const options = baseOptions();
+  await seedEvaluationJob(options);
+  await withServer(options, async (baseUrl) => {
+    const claimed = (await (await workerRequest(baseUrl, "claim")).json()).job;
+    const invalid = await workerRequest(baseUrl, "complete", {
+      job_id: claimed.job_id,
+      lease_token: claimed.lease_token,
+      error_code: "provider said secret details",
+    });
+    assert.equal(invalid.status, 400);
+    const failed = await workerRequest(baseUrl, "complete", {
+      job_id: claimed.job_id,
+      lease_token: claimed.lease_token,
+      error_code: "timeout",
+    });
+    assert.equal(failed.status, 200);
+    assert.equal((await failed.json()).status, "pending");
+  });
+});
+
+test("separates feedback-worker authentication and rejects unknown jobs", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    assert.equal((await workerRequest(baseUrl, "claim", {}, secret)).status, 401);
+    const unknown = await workerRequest(baseUrl, "complete", {
+      job_id: "job-missing",
+      lease_token: "lease-token-with-at-least-32-characters",
+      error_code: "process_error",
+    });
+    assert.equal(unknown.status, 404);
   });
 });
