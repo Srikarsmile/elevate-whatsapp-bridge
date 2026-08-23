@@ -4,6 +4,8 @@ import test from "node:test";
 import { createBridgeServer } from "../src/server.js";
 
 const secret = "test-bridge-secret-with-enough-entropy";
+const webhookToken = "test-webhook-token-with-enough-entropy";
+const phoneHashSalt = "test-phone-hash-salt-with-enough-entropy";
 const validBody = {
   request_id: "call-123:mid-call",
   to: "918688664337",
@@ -61,9 +63,18 @@ async function postCallback(baseUrl, body, options = {}) {
   });
 }
 
+async function postWebhook(baseUrl, route, body, token = webhookToken) {
+  return fetch(`${baseUrl}/v1/sarvam/${route}/${encodeURIComponent(token)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
 function createMemoryCallbackStore() {
   const byId = new Map();
   const byRequestId = new Map();
+  const transitions = [];
   return {
     async book(request) {
       const existingId = byRequestId.get(request.request_id);
@@ -80,12 +91,50 @@ function createMemoryCallbackStore() {
     get(id) {
       return byId.get(id);
     },
+    async transition(id, status, { at, reason, metadata = {} }) {
+      const current = byId.get(id);
+      if (!current) throw new Error("Callback not found");
+      const next = { ...current, ...metadata, status, updated_at: at };
+      byId.set(id, next);
+      transitions.push({ id, status, reason });
+      return next;
+    },
+    countPending() {
+      return [...byId.values()].filter((booking) =>
+        ["scheduled", "dispatching", "dialing"].includes(booking.status)
+      ).length;
+    },
+    transitions,
+  };
+}
+
+function createMemoryCallEventStore(operationOrder = []) {
+  const values = new Map();
+  return {
+    get: (id) => values.get(id),
+    list: (predicate = () => true) => [...values.values()].filter(predicate),
+    count: (predicate = () => true) => [...values.values()].filter(predicate).length,
+    async put(value) {
+      const existing = values.get(value.event_id);
+      if (existing) return { record: existing, duplicate: true };
+      operationOrder.push(`persist:${value.status}`);
+      values.set(value.event_id, value);
+      return { record: value, duplicate: false };
+    },
   };
 }
 
 function baseOptions(overrides = {}) {
   const calls = [];
   const logs = [];
+  const operationOrder = [];
+  const callbackStore = createMemoryCallbackStore();
+  const originalTransition = callbackStore.transition;
+  callbackStore.transition = async (...args) => {
+    operationOrder.push(`transition:${args[1]}`);
+    return originalTransition(...args);
+  };
+  const callEventStore = createMemoryCallEventStore(operationOrder);
   const transport = {
     status: () => "connected",
     send: async (message) => {
@@ -97,11 +146,24 @@ function baseOptions(overrides = {}) {
     secret,
     transport,
     store: createMemoryStore(),
-    callbackStore: createMemoryCallbackStore(),
+    callbackStore,
+    callEventStore,
+    webhookToken,
+    phoneHashSalt,
+    healthStatus: () => ({
+      callbackScheduler: "disabled",
+      callbackDispatchMode: "disabled",
+      sarvamConfigured: true,
+      pendingCallbacks: callbackStore.countPending(),
+      pendingEvaluations: callEventStore.count(
+        (event) => event.evaluation_status === "pending"
+      ),
+    }),
     architectureImagePath: "/private/architecture.png",
     logger: { info: (entry) => logs.push(entry), error: (entry) => logs.push(entry) },
     calls,
     logs,
+    operationOrder,
     ...overrides,
   };
 }
@@ -121,12 +183,63 @@ const validCallback = {
   source_interaction_id: "interaction-123",
 };
 
+function outboundEvent(bookingId, overrides = {}) {
+  return {
+    attempt_id: "attempt-123",
+    status: "connected",
+    channel_info: {
+      channel_type: "v2v",
+      channel_provider: "vobiz",
+      agent_phone_number: "+918071581315",
+    },
+    duration: 42,
+    interaction_id: "20260823/interaction-123",
+    failure_reason: null,
+    final_agent_variables: { intent_level: "Hot" },
+    webhook_config: {
+      url: `https://example.test/v1/sarvam/outbound-events/${webhookToken}`,
+      metadata: { booking_id: bookingId, request_id: validCallback.request_id },
+    },
+    interaction_transcript: [
+      { role: "agent", en_text: "Hello, is now a good time?" },
+      { role: "user", en_text: "Yes, go ahead." },
+    ],
+    ...overrides,
+  };
+}
+
+function onEndEvent(overrides = {}) {
+  return {
+    interaction_id: "20260823/on-end-123",
+    app_id: "app-test",
+    app_version: 7,
+    status: "connected",
+    duration: 57,
+    user_phone_number: "+918639885985",
+    final_agent_variables: { intent_level: "Warm" },
+    interaction_transcript: [
+      { role: "agent", en_text: "What would you like to improve?" },
+      { role: "user", en_text: "I need a faster website." },
+    ],
+    tool_results: [],
+    ...overrides,
+  };
+}
+
 test("health reports transport state without authentication", async () => {
   const options = baseOptions();
   await withServer(options, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, whatsapp: "connected" });
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      whatsapp: "connected",
+      callbackScheduler: "disabled",
+      callbackDispatchMode: "disabled",
+      sarvamConfigured: true,
+      pendingCallbacks: 0,
+      pendingEvaluations: 0,
+    });
   });
 });
 
@@ -307,4 +420,130 @@ test("returns not found for an unknown callback booking", async () => {
     });
     assert.equal(response.status, 404);
   });
+});
+
+test("accepts a correlated Sarvam outbound event and persists it before callback state", async () => {
+  const options = baseOptions();
+  const { booking } = await options.callbackStore.book(validCallback);
+  await options.callbackStore.transition(booking.booking_id, "dispatching", {
+    at: new Date().toISOString(),
+    reason: "scheduler_claimed",
+  });
+  options.operationOrder.length = 0;
+
+  await withServer(options, async (baseUrl) => {
+    const response = await postWebhook(
+      baseUrl,
+      "outbound-events",
+      outboundEvent(booking.booking_id)
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, duplicate: false });
+  });
+
+  const current = options.callbackStore.get(booking.booking_id);
+  assert.equal(current.status, "connected");
+  assert.equal(current.attempt_id, "attempt-123");
+  assert.equal(current.interaction_id, "20260823/interaction-123");
+  assert.deepEqual(options.operationOrder, [
+    "persist:connected",
+    "transition:dialing",
+    "transition:connected",
+  ]);
+  const event = options.callEventStore.list()[0];
+  assert.equal(event.phone_last4, "4337");
+  assert.doesNotMatch(JSON.stringify(event), /918688664337|test-webhook-token/);
+});
+
+test("maps Sarvam non-connected outcomes onto callback state", async () => {
+  for (const status of ["no_answer", "busy", "failed"]) {
+    const options = baseOptions();
+    const request = { ...validCallback, request_id: `call-${status}:callback` };
+    const { booking } = await options.callbackStore.book(request);
+    await options.callbackStore.transition(booking.booking_id, "dispatching", {
+      at: new Date().toISOString(),
+      reason: "scheduler_claimed",
+    });
+    await options.callbackStore.transition(booking.booking_id, "dialing", {
+      at: new Date().toISOString(),
+      reason: "sarvam_accepted",
+      metadata: { attempt_id: `attempt-${status}` },
+    });
+    await withServer(options, async (baseUrl) => {
+      const response = await postWebhook(
+        baseUrl,
+        "outbound-events",
+        outboundEvent(booking.booking_id, {
+          attempt_id: `attempt-${status}`,
+          status,
+          interaction_id: null,
+          duration: null,
+          failure_reason: status === "failed" ? "provider rejected call" : null,
+          interaction_transcript: null,
+        })
+      );
+      assert.equal(response.status, 200);
+    });
+    assert.equal(options.callbackStore.get(booking.booking_id).status, status);
+  }
+});
+
+test("hides webhook endpoints behind their path token", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    const wrong = await postWebhook(baseUrl, "on-end", onEndEvent(), "wrong-token");
+    assert.equal(wrong.status, 404);
+    const missing = await fetch(`${baseUrl}/v1/sarvam/on-end`, { method: "POST" });
+    assert.equal(missing.status, 404);
+  });
+  assert.equal(options.callEventStore.list().length, 0);
+});
+
+test("stores a valid on-end event without changing callback state", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    const first = await postWebhook(baseUrl, "on-end", onEndEvent());
+    const duplicate = await postWebhook(baseUrl, "on-end", onEndEvent());
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), { ok: true, duplicate: false });
+    assert.equal(duplicate.status, 200);
+    assert.deepEqual(await duplicate.json(), { ok: true, duplicate: true });
+  });
+  assert.equal(options.callEventStore.list().length, 1);
+  assert.equal(options.callbackStore.transitions.length, 0);
+});
+
+test("rejects malformed, oversized, unknown, and uncorrelated webhook payloads", async () => {
+  const options = baseOptions({ webhookBodyLimitBytes: 2048 });
+  await withServer(options, async (baseUrl) => {
+    assert.equal((await postWebhook(baseUrl, "on-end", "not-json")).status, 400);
+    assert.equal(
+      (await postWebhook(baseUrl, "on-end", `{"padding":"${"x".repeat(2200)}"}`))
+        .status,
+      413
+    );
+    assert.equal((await postWebhook(baseUrl, "on-end", { unexpected: true })).status, 400);
+    assert.equal(
+      (
+        await postWebhook(
+          baseUrl,
+          "outbound-events",
+          outboundEvent("cb-ffffffffffffffff")
+        )
+      ).status,
+      404
+    );
+  });
+  assert.equal(options.callEventStore.list().length, 0);
+});
+
+test("webhook logs omit tokens, transcripts, and full phone numbers", async () => {
+  const options = baseOptions();
+  await withServer(options, async (baseUrl) => {
+    assert.equal((await postWebhook(baseUrl, "on-end", onEndEvent())).status, 200);
+  });
+  const serialized = JSON.stringify(options.logs);
+  assert.doesNotMatch(serialized, new RegExp(webhookToken));
+  assert.doesNotMatch(serialized, /faster website|918639885985/);
+  assert.match(serialized, /20260823\/on-end-123/);
 });
