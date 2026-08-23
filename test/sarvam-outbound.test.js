@@ -25,6 +25,7 @@ const booking = {
   to: "918639885985",
   prospect_name: "Srikar",
   context_summary: "Requested a five-minute callback",
+  callback_time_human: "in five minutes",
 };
 
 function response(status, body) {
@@ -48,6 +49,9 @@ test("builds the documented outbound payload with correlation metadata", () => {
         prospect_name: "Srikar",
         recipient_number: "+918639885985",
         user_name: "Srikar",
+        initial_call_type: "callback",
+        prior_call_context: "Requested a five-minute callback",
+        requested_callback_time: "in five minutes",
       },
     },
     user_config: { user_phone_number: "+918639885985" },
@@ -58,6 +62,19 @@ test("builds the documented outbound payload with correlation metadata", () => {
         request_id: "call-123:callback",
       },
     },
+  });
+});
+
+test("carries the prior conversation into the callback agent session", () => {
+  const payload = buildOutboundPayload(booking, config);
+
+  assert.deepEqual(payload.app_config.agent_variables, {
+    prospect_name: "Srikar",
+    recipient_number: "+918639885985",
+    user_name: "Srikar",
+    initial_call_type: "callback",
+    prior_call_context: "Requested a five-minute callback",
+    requested_callback_time: "in five minutes",
   });
 });
 
