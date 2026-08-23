@@ -209,6 +209,36 @@ test("replays callback correlation after a crash without duplicating the event",
   assert.equal(eventStore.count(), 1);
 });
 
+test("reconciles a late provider event after the callback outcome timed out", async () => {
+  let booking = {
+    booking_id: "cb-1111111111111111",
+    status: "outcome_unknown",
+    to: "918639885985",
+  };
+  const transitions = [];
+  const callbackStore = {
+    get: () => booking,
+    async transition(id, status, transition) {
+      booking = { ...booking, ...transition.metadata, status };
+      transitions.push(status);
+      return booking;
+    },
+  };
+  const eventStore = memoryStore("event_id", [
+    event({
+      source: "instant_outbound",
+      attempt_id: "attempt-123",
+      correlation: { booking_id: booking.booking_id },
+    }),
+  ]);
+  const processor = createEventProcessor(processorOptions({ eventStore, callbackStore }));
+
+  await processor.runOnce();
+
+  assert.deepEqual(transitions, ["connected"]);
+  assert.equal(booking.status, "connected");
+});
+
 test("removes transcripts older than 30 days while retaining score and finding codes", async () => {
   const old = event({
     received_at: "2026-07-01T00:00:00.000Z",

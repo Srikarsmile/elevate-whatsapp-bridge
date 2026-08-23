@@ -152,7 +152,7 @@ async function applyOutboundEvent(callbackStore, bookingId, event) {
       metadata: transitionMetadata(event),
     });
   }
-  if (booking.status === "dialing") {
+  if (["dialing", "outcome_unknown"].includes(booking.status)) {
     await callbackStore.transition(bookingId, event.status, {
       at: event.received_at,
       reason: `sarvam_${event.status}`,

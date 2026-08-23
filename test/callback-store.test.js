@@ -89,6 +89,49 @@ test("recovers interrupted dispatches as unknown without redialing", async () =>
   assert.equal(reopened.listDue(new Date("2026-08-23T06:00:00.000Z")).length, 0);
 });
 
+test("quarantines stale dialing outcomes while preserving late reconciliation", async () => {
+  const { filePath, store } = await storeAt();
+  const stale = await store.book(request({ request_id: "call-stale:callback" }));
+  await store.transition(stale.booking.booking_id, "dispatching", {
+    at: "2026-08-23T05:00:00.000Z",
+    reason: "callback_due",
+  });
+  await store.transition(stale.booking.booking_id, "dialing", {
+    at: "2026-08-23T05:00:01.000Z",
+    reason: "sarvam_accepted",
+    metadata: { attempt_id: "attempt-stale" },
+  });
+
+  const recent = await store.book(request({ request_id: "call-recent-dialing:callback" }));
+  await store.transition(recent.booking.booking_id, "dispatching", {
+    at: "2026-08-23T05:09:30.000Z",
+    reason: "callback_due",
+  });
+  await store.transition(recent.booking.booking_id, "dialing", {
+    at: "2026-08-23T05:09:31.000Z",
+    reason: "sarvam_accepted",
+    metadata: { attempt_id: "attempt-recent" },
+  });
+
+  const reopened = await PersistentCallbackStore.open({ filePath, maxRecords: 1000 });
+  const recovered = await reopened.recover(new Date("2026-08-23T05:10:01.001Z"));
+
+  assert.equal(recovered.length, 1);
+  assert.equal(reopened.get(stale.booking.booking_id).status, "outcome_unknown");
+  assert.equal(
+    reopened.get(stale.booking.booking_id).history.at(-1).reason,
+    "outcome_webhook_timeout"
+  );
+  assert.equal(reopened.get(recent.booking.booking_id).status, "dialing");
+  assert.equal(reopened.countPending(), 1);
+
+  await reopened.transition(stale.booking.booking_id, "connected", {
+    at: "2026-08-23T05:11:00.000Z",
+    reason: "sarvam_connected",
+  });
+  assert.equal(reopened.get(stale.booking.booking_id).status, "connected");
+});
+
 test("expires callbacks more than ten minutes overdue on recovery", async () => {
   const { store } = await storeAt();
   const old = await store.book(

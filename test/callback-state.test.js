@@ -10,7 +10,8 @@ import {
 const transitions = {
   scheduled: ["dispatching", "expired"],
   dispatching: ["dialing", "failed", "dispatch_unknown"],
-  dialing: ["connected", "no_answer", "busy", "failed"],
+  dialing: ["connected", "no_answer", "busy", "failed", "outcome_unknown"],
+  outcome_unknown: ["connected", "no_answer", "busy", "failed"],
   connected: [],
   no_answer: [],
   busy: [],

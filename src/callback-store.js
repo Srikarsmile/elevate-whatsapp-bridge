@@ -8,6 +8,8 @@ import {
   transitionRecord,
 } from "./callback-state.js";
 
+const OUTCOME_WEBHOOK_TIMEOUT_MS = 10 * 60 * 1000;
+
 function bookingId(requestId) {
   return `cb-${createHash("sha256").update(requestId).digest("hex").slice(0, 16)}`;
 }
@@ -106,6 +108,14 @@ export class PersistentCallbackStore {
           next = transitionRecord(current, "dispatch_unknown", {
             at,
             reason: "restart_during_dispatch",
+          });
+        } else if (
+          current.status === "dialing" &&
+          now.getTime() - Date.parse(current.updated_at) > OUTCOME_WEBHOOK_TIMEOUT_MS
+        ) {
+          next = transitionRecord(current, "outcome_unknown", {
+            at,
+            reason: "outcome_webhook_timeout",
           });
         } else if (
           current.status === "scheduled" &&

@@ -113,6 +113,7 @@ export function createCallbackScheduler({
     if (active) return active;
 
     const operation = (async () => {
+      if (typeof store.recover === "function") await store.recover(now);
       const due = store.listDue(now);
       let processed = 0;
       for (const booking of due) {

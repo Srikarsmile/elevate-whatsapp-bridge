@@ -21,10 +21,15 @@
 
 `scheduled` -> `dispatching` -> `dialing` -> `connected | no_answer | busy | failed`
 
+If no provider outcome arrives within ten minutes, `dialing` becomes
+`outcome_unknown`. It is never redialed automatically, but a late signed Sarvam
+outcome can still reconcile it to the authoritative terminal state.
+
 - `disabled`: due work remains `scheduled` because outbound calling is off.
 - `dry_run`: records a redacted `callback_dry_run` event, then closes the rehearsal as `expired` with reason `dry_run_completed_without_call`.
 - `failed`: a conclusive provider rejection is terminal and requires operator review before any new booking.
 - `dispatch_unknown`: a timeout or ambiguous transport failure is quarantined. Never retry it automatically because the provider may already have accepted the call.
+- `outcome_unknown`: Sarvam accepted the call but no signed outcome arrived within ten minutes. Reconcile it from provider logs or a late webhook; never redial it automatically.
 
 ## Before any live demo
 

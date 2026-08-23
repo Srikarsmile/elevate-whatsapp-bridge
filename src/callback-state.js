@@ -1,7 +1,8 @@
 const LEGAL_TRANSITIONS = Object.freeze({
   scheduled: new Set(["dispatching", "expired"]),
   dispatching: new Set(["dialing", "failed", "dispatch_unknown"]),
-  dialing: new Set(["connected", "no_answer", "busy", "failed"]),
+  dialing: new Set(["connected", "no_answer", "busy", "failed", "outcome_unknown"]),
+  outcome_unknown: new Set(["connected", "no_answer", "busy", "failed"]),
   connected: new Set(),
   no_answer: new Set(),
   busy: new Set(),

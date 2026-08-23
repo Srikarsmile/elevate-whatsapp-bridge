@@ -645,6 +645,44 @@ test("maps Sarvam non-connected outcomes onto callback state", async () => {
   }
 });
 
+test("accepts a late Sarvam outcome for a quarantined callback", async () => {
+  const options = baseOptions();
+  const { booking } = await options.callbackStore.book({
+    ...validCallback,
+    request_id: "call-late-outcome:callback",
+  });
+  await options.callbackStore.transition(booking.booking_id, "dispatching", {
+    at: new Date().toISOString(),
+    reason: "scheduler_claimed",
+  });
+  await options.callbackStore.transition(booking.booking_id, "dialing", {
+    at: new Date().toISOString(),
+    reason: "sarvam_accepted",
+    metadata: { attempt_id: "attempt-late" },
+  });
+  await options.callbackStore.transition(booking.booking_id, "outcome_unknown", {
+    at: new Date().toISOString(),
+    reason: "outcome_webhook_timeout",
+  });
+
+  await withServer(options, async (baseUrl) => {
+    const response = await postWebhook(
+      baseUrl,
+      "outbound-events",
+      outboundEvent(booking.booking_id, {
+        attempt_id: "attempt-late",
+        status: "no_answer",
+        interaction_id: null,
+        duration: null,
+        interaction_transcript: null,
+      })
+    );
+    assert.equal(response.status, 200);
+  });
+
+  assert.equal(options.callbackStore.get(booking.booking_id).status, "no_answer");
+});
+
 test("hides webhook endpoints behind their path token", async () => {
   const options = baseOptions();
   await withServer(options, async (baseUrl) => {

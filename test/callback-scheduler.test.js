@@ -238,6 +238,27 @@ test("starts after recovery and stops its timer cleanly", async () => {
   await scheduled();
   await scheduler.stop();
 
-  assert.deepEqual(calls, ["recover", "interval:1000", "clear:42"]);
+  assert.deepEqual(calls, ["recover", "interval:1000", "recover", "clear:42"]);
   assert.equal(scheduler.status(), "stopped");
+});
+
+test("recovers stale provider outcomes during normal polling", async () => {
+  const recoveredAt = [];
+  const scheduler = createCallbackScheduler({
+    mode: "live",
+    store: {
+      async recover(now) {
+        recoveredAt.push(now.toISOString());
+      },
+      listDue: () => [],
+    },
+    outboundClient: {},
+    outboundEventStore: {},
+    appVersion: "1",
+    logger: logger(),
+  });
+
+  const now = new Date("2026-08-23T05:10:01.001Z");
+  assert.equal(await scheduler.runOnce(now), 0);
+  assert.deepEqual(recoveredAt, [now.toISOString()]);
 });
