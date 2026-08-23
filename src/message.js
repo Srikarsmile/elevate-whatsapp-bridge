@@ -54,7 +54,6 @@ export function formatMessage(
   request,
   {
     architectureImagePath = null,
-    resumePath = null,
     implementationNote = null,
   } = {}
 ) {
@@ -82,27 +81,18 @@ export function formatMessage(
   const attachments = [];
   if (request.stage === "post_call") {
     if (!architectureImagePath) throw new Error("Post-call architecture image is required");
-    if (!resumePath) throw new Error("Post-call resume is required");
     const note = implementationNote?.trim();
     if (!note) throw new Error("Post-call implementation note is required");
     if (note.split(/\s+/).length > 200) {
       throw new Error("Post-call implementation note must be at most 200 words");
     }
     sections.push(note);
-    attachments.push(
-      {
-        path: architectureImagePath,
-        kind: "image",
-        fileName: "elevatebox-architecture.png",
-        mimetype: "image/png",
-      },
-      {
-        path: resumePath,
-        kind: "document",
-        fileName: "Srikar-Reddy-Software-Engineer-CV.pdf",
-        mimetype: "application/pdf",
-      }
-    );
+    attachments.push({
+      path: architectureImagePath,
+      kind: "image",
+      fileName: "elevatebox-architecture.png",
+      mimetype: "image/png",
+    });
   }
 
   return {

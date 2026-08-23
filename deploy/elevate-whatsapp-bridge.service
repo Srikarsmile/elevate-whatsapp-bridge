@@ -16,7 +16,6 @@ Environment=EVALUATION_JOBS_PATH=/var/lib/elevate-whatsapp-bridge/evaluation-job
 Environment=FEEDBACK_PATH=/var/lib/elevate-whatsapp-bridge/feedback.json
 Environment=EVALUATION_CASES_PATH=/var/lib/elevate-whatsapp-bridge/evaluation-cases.json
 Environment=RECOMMENDATIONS_PATH=/var/lib/elevate-whatsapp-bridge/recommendations.json
-Environment=RESUME_PATH=/var/lib/elevate-whatsapp-bridge/assets/Srikar-Reddy-Software-Engineer-CV.pdf
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 RestartSec=5s

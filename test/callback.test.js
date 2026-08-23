@@ -26,6 +26,15 @@ test("accepts a callback for the controlled test recipient", () => {
   assert.deepEqual(parseCallbackRequest(request, { now }), request);
 });
 
+test("timestamps an explicitly confirmed callback when the tool omits confirmed_at", () => {
+  const { confirmed_at: _confirmedAt, ...withoutTimestamp } = valid;
+
+  assert.deepEqual(parseCallbackRequest(withoutTimestamp, { now }), {
+    ...withoutTimestamp,
+    confirmed_at: now.toISOString(),
+  });
+});
+
 test("normalizes a formatted approved callback recipient", () => {
   const request = { ...valid, to: "+91-86886-64337" };
   assert.deepEqual(parseCallbackRequest(request, { now }), {

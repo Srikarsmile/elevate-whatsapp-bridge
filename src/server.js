@@ -160,7 +160,6 @@ export function createBridgeServer({
   feedbackWorkerToken = null,
   evaluationQueue = null,
   architectureImagePath = null,
-  resumePath = null,
   implementationNote = null,
   bodyLimitBytes = DEFAULT_BODY_LIMIT,
   webhookBodyLimitBytes = DEFAULT_WEBHOOK_BODY_LIMIT,
@@ -561,7 +560,6 @@ export function createBridgeServer({
     const delivery = (async () => {
       const message = formatMessage(parsed, {
         architectureImagePath,
-        resumePath,
         implementationNote,
       });
       await transport.send({ to: parsed.to, ...message });

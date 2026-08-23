@@ -15,7 +15,7 @@ import { createBridgeServer } from "./server.js";
 
 process.umask(0o077);
 
-const required = ["BRIDGE_SECRET", "RESUME_PATH", "IMPLEMENTATION_NOTE"];
+const required = ["BRIDGE_SECRET", "IMPLEMENTATION_NOTE"];
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length > 0) {
   throw new Error(`Missing required environment: ${missing.join(", ")}`);
@@ -120,7 +120,6 @@ const server = createBridgeServer({
   }),
   architectureImagePath:
     process.env.ARCHITECTURE_IMAGE_PATH || `${stateDir}/assets/architecture.png`,
-  resumePath: process.env.RESUME_PATH,
   implementationNote: process.env.IMPLEMENTATION_NOTE,
   logger,
 });

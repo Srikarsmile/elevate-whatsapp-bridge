@@ -75,7 +75,7 @@ test("formats captured facts and always includes Srikar's contact number", () =>
   assert.deepEqual(result.attachments, []);
 });
 
-test("adds the required architecture and resume artifacts to a post-call follow-up", () => {
+test("adds the architecture artifact without attaching a resume to a post-call follow-up", () => {
   const request = parseMessageRequest({
     request_id: "call-789:post-call",
     to: "918688664337",
@@ -86,7 +86,6 @@ test("adds the required architecture and resume artifacts to a post-call follow-
 
   const result = formatMessage(request, {
     architectureImagePath: "/private/architecture.png",
-    resumePath: "/private/resume.pdf",
     implementationNote:
       "The live Sarvam agent qualifies the lead while Hermes handles WhatsApp and callback actions. The linked WhatsApp transport is experimental; Meta Cloud API is the production replacement.",
   });
@@ -102,16 +101,10 @@ test("adds the required architecture and resume artifacts to a post-call follow-
       fileName: "elevatebox-architecture.png",
       mimetype: "image/png",
     },
-    {
-      path: "/private/resume.pdf",
-      kind: "document",
-      fileName: "Srikar-Reddy-Software-Engineer-CV.pdf",
-      mimetype: "application/pdf",
-    },
   ]);
 });
 
-test("rejects an incomplete post-call artifact package", () => {
+test("rejects a post-call follow-up without the architecture artifact", () => {
   const request = parseMessageRequest({
     request_id: "call-790:post-call",
     to: "918688664337",
@@ -122,10 +115,9 @@ test("rejects an incomplete post-call artifact package", () => {
   assert.throws(
     () =>
       formatMessage(request, {
-        architectureImagePath: "/private/architecture.png",
         implementationNote: "Working demo note.",
       }),
-    /resume/i
+    /architecture/i
   );
 });
 
@@ -141,7 +133,6 @@ test("rejects a post-call implementation note over 200 words", () => {
     () =>
       formatMessage(request, {
         architectureImagePath: "/private/architecture.png",
-        resumePath: "/private/resume.pdf",
         implementationNote: Array.from({ length: 201 }, () => "word").join(" "),
       }),
     /200 words/

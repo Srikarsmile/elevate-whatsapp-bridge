@@ -25,14 +25,18 @@ const callbackRequestSchema = z
     prospect_name: bounded,
     context_summary: bounded,
     confirmed_by_user: z.literal(true),
-    confirmed_at: z.iso.datetime({ offset: true }),
+    confirmed_at: z.iso.datetime({ offset: true }).optional(),
     source_interaction_id: z.string().trim().min(1).max(240).optional(),
   })
   .strict();
 
 export function parseCallbackRequest(value, { now = new Date() } = {}) {
   const parsed = callbackRequestSchema.parse(value);
-  const delayMs = Date.parse(parsed.callback_time_iso) - now.getTime();
+  const callback = {
+    ...parsed,
+    confirmed_at: parsed.confirmed_at || now.toISOString(),
+  };
+  const delayMs = Date.parse(callback.callback_time_iso) - now.getTime();
   if (delayMs <= 0) {
     throw new Error("Callback time must be in the future");
   }
@@ -42,8 +46,8 @@ export function parseCallbackRequest(value, { now = new Date() } = {}) {
   if (delayMs > 7 * 24 * 60 * 60 * 1000) {
     throw new Error("Callback must be within seven days");
   }
-  if (Date.parse(parsed.confirmed_at) > now.getTime()) {
+  if (Date.parse(callback.confirmed_at) > now.getTime()) {
     throw new Error("Callback confirmation time cannot be in the future");
   }
-  return parsed;
+  return callback;
 }
