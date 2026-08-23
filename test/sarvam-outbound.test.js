@@ -46,7 +46,8 @@ test("builds the documented outbound payload with correlation metadata", () => {
       },
       agent_variables: {
         prospect_name: "Srikar",
-        callback_context: "Requested a five-minute callback",
+        recipient_number: "+918639885985",
+        user_name: "Srikar",
       },
     },
     user_config: { user_phone_number: "+918639885985" },

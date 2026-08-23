@@ -26,7 +26,8 @@ export function buildOutboundPayload(booking, config) {
       },
       agent_variables: {
         prospect_name: booking.prospect_name,
-        callback_context: booking.context_summary,
+        recipient_number: `+${recipient}`,
+        user_name: booking.prospect_name,
       },
     },
     user_config: { user_phone_number: `+${recipient}` },
