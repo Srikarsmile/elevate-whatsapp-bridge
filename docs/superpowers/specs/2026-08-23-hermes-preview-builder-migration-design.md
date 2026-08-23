@@ -1,6 +1,6 @@
 # Hermes Preview Builder Migration
 
-**Status:** Draft for review
+**Status:** Approved design
 **Date:** 2026-08-23
 **Source:** `/opt/synqora-builder` on `Synqora_Srikar`
 **Destination:** `srikarhermes-vps`
