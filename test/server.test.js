@@ -106,14 +106,19 @@ function baseOptions(overrides = {}) {
   };
 }
 
+const callbackTimeIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+const confirmedAtIso = new Date(Date.now() - 1000).toISOString();
 const validCallback = {
   request_id: "call-123:callback",
   to: "918688664337",
-  callback_time_iso: "2099-08-23T10:30:00+05:30",
-  callback_time_human: "tomorrow morning at ten thirty",
+  callback_time_iso: callbackTimeIso,
+  callback_time_human: "in one hour",
   timezone: "Asia/Kolkata",
   prospect_name: "ElevateBox hiring team",
   context_summary: "Requested a callback after discussing an online store.",
+  confirmed_by_user: true,
+  confirmed_at: confirmedAtIso,
+  source_interaction_id: "interaction-123",
 };
 
 test("health reports transport state without authentication", async () => {
@@ -249,8 +254,8 @@ test("books and returns a redacted callback status", async () => {
       ok: true,
       bookingId: "cb-0000000000000001",
       status: "scheduled",
-      callbackTimeIso: "2099-08-23T10:30:00+05:30",
-      callbackTimeHuman: "tomorrow morning at ten thirty",
+      callbackTimeIso,
+      callbackTimeHuman: "in one hour",
     });
     assert.doesNotMatch(JSON.stringify(body), /online store/);
   });

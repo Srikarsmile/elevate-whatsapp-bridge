@@ -1,19 +1,31 @@
 import { z } from "zod";
 
-export const ASSIGNMENT_RECIPIENT = "918688664337";
-export const CONTROLLED_TEST_RECIPIENT = "918639885985";
-export const ALLOWED_RECIPIENTS = Object.freeze([
+import { assertAllowedRecipient, SRIKAR_CONTACT } from "./phone-policy.js";
+
+export {
+  ALLOWED_RECIPIENTS,
   ASSIGNMENT_RECIPIENT,
   CONTROLLED_TEST_RECIPIENT,
-]);
-export const SRIKAR_CONTACT = "+918639885985";
+  SRIKAR_CONTACT,
+} from "./phone-policy.js";
 
 const bounded = z.string().trim().min(1).max(500);
+const approvedRecipient = z.string().transform((value, context) => {
+  try {
+    return assertAllowedRecipient(value);
+  } catch {
+    context.addIssue({
+      code: "custom",
+      message: "Invalid option: recipient is not in the demo allowlist",
+    });
+    return z.NEVER;
+  }
+});
 
 const messageRequestSchema = z
   .object({
     request_id: z.string().trim().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/),
-    to: z.enum(ALLOWED_RECIPIENTS),
+    to: approvedRecipient,
     stage: z.enum(["mid_call", "post_call"]),
     classification: z.enum(["Hot", "Warm", "Cold"]),
     business: bounded.optional(),
@@ -59,8 +71,8 @@ export function formatMessage(
 
   const opening =
     request.stage === "mid_call"
-      ? "Thanks for speaking with Priya. Here is the context from our live conversation:"
-      : "Thanks for speaking with Priya about your e-commerce website. Here is what I understood:";
+      ? "Thanks for speaking with our website specialist. Here is the context from our live conversation:"
+      : "Thanks for speaking with our website specialist about your e-commerce website. Here is what I understood:";
 
   const sections = [opening];
   if (details.length > 0) sections.push(details.join("\n"));

@@ -12,6 +12,9 @@ const valid = {
   timezone: "Asia/Kolkata",
   prospect_name: "ElevateBox hiring team",
   context_summary: "Interested in an e-commerce website and requested a callback.",
+  confirmed_by_user: true,
+  confirmed_at: "2026-08-22T12:00:00.000Z",
+  source_interaction_id: "20260822/interaction-123",
 };
 
 test("accepts a confirmed future callback in India time", () => {
@@ -21,6 +24,14 @@ test("accepts a confirmed future callback in India time", () => {
 test("accepts a callback for the controlled test recipient", () => {
   const request = { ...valid, to: "918639885985" };
   assert.deepEqual(parseCallbackRequest(request, { now }), request);
+});
+
+test("normalizes a formatted approved callback recipient", () => {
+  const request = { ...valid, to: "+91-86886-64337" };
+  assert.deepEqual(parseCallbackRequest(request, { now }), {
+    ...request,
+    to: "918688664337",
+  });
 });
 
 test("rejects a callback outside the demo allowlist", () => {
@@ -46,6 +57,51 @@ test("rejects a callback at or before the current time", () => {
       ),
     /future/
   );
+});
+
+test("requires at least fifteen seconds before the callback", () => {
+  assert.throws(
+    () =>
+      parseCallbackRequest(
+        { ...valid, callback_time_iso: "2026-08-22T12:00:14.999Z" },
+        { now }
+      ),
+    /15 seconds/
+  );
+});
+
+test("rejects callbacks more than seven days ahead", () => {
+  assert.throws(
+    () =>
+      parseCallbackRequest(
+        { ...valid, callback_time_iso: "2026-08-29T12:00:00.001Z" },
+        { now }
+      ),
+    /seven days/
+  );
+});
+
+test("requires explicit user confirmation", () => {
+  assert.throws(
+    () => parseCallbackRequest({ ...valid, confirmed_by_user: false }, { now }),
+    /Invalid input/
+  );
+});
+
+test("requires confirmation at or before booking", () => {
+  assert.throws(
+    () =>
+      parseCallbackRequest(
+        { ...valid, confirmed_at: "2026-08-22T12:00:01.000Z" },
+        { now }
+      ),
+    /confirmation time/
+  );
+});
+
+test("allows a callback without a source interaction ID", () => {
+  const { source_interaction_id, ...request } = valid;
+  assert.deepEqual(parseCallbackRequest(request, { now }), request);
 });
 
 test("rejects unknown callback fields", () => {

@@ -25,6 +25,14 @@ test("accepts the controlled test recipient", () => {
   assert.deepEqual(parseMessageRequest(request), request);
 });
 
+test("normalizes a formatted approved message recipient", () => {
+  const request = { ...validMidCall, to: "+91 86398 85985" };
+  assert.deepEqual(parseMessageRequest(request), {
+    ...request,
+    to: "918639885985",
+  });
+});
+
 test("rejects destinations outside the demo allowlist", () => {
   assert.throws(
     () => parseMessageRequest({ ...validMidCall, to: "919999999999" }),
@@ -83,7 +91,8 @@ test("adds the required architecture and resume artifacts to a post-call follow-
       "The live Sarvam agent qualifies the lead while Hermes handles WhatsApp and callback actions. The linked WhatsApp transport is experimental; Meta Cloud API is the production replacement.",
   });
 
-  assert.match(result.text, /Thanks for speaking with Priya/);
+  assert.match(result.text, /Thanks for speaking with our website specialist/);
+  assert.doesNotMatch(result.text, /Priya/);
   assert.match(result.text, /Lead status: Warm/);
   assert.match(result.text, /live Sarvam agent qualifies the lead/);
   assert.deepEqual(result.attachments, [
