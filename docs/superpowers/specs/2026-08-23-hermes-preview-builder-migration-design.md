@@ -89,6 +89,9 @@ job API covered by a separate design.
 The repository includes:
 
 - `src/`, `bin/`, `config/`, `scripts/`, `systemd/`, `tmpfiles/`, and `tests/`;
+- the non-secret builder skill bundle from
+  `/var/lib/synqora-builder/skills`, copied into repository-owned `skills/`
+  after size and credential-pattern checks;
 - `package.json`, `package-lock.json`, `pyproject.toml`, and `.gitignore`;
 - a provenance file containing the source host alias, source path, UTC capture
   time, and SHA-256 digest of the sanitized tree;
