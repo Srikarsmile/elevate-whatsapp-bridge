@@ -240,6 +240,7 @@ function baseOptions(overrides = {}) {
     }),
     architectureImagePath: "/private/architecture.png",
     resumePath: "/private/Srikar-Reddy-Software-Engineer-CV.pdf",
+    previewUrl: "https://preview.example.test",
     repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
     implementationNote:
       "The Sarvam agent qualifies the lead while Hermes handles durable WhatsApp and callback actions.",
@@ -361,7 +362,7 @@ test("accepts a body request ID and sends a formatted message once", async () =>
     });
     assert.equal(options.calls.length, 1);
     assert.equal(options.calls[0].to, "918688664337");
-    assert.match(options.calls[0].text, /Business: books/);
+    assert.match(options.calls[0].text, /planning an online store for books/);
   });
 });
 
@@ -600,8 +601,10 @@ test("accepts a correlated Sarvam outbound event and persists it before callback
   ]);
   assert.equal(options.calls.length, 1);
   assert.equal(options.calls[0].to, "918688664337");
-  assert.match(options.calls[0].text, /Business: speciality foods/);
-  assert.match(options.calls[0].text, /Lead status: Warm/);
+  assert.match(options.calls[0].text, /online store for speciality foods with about 40/);
+  assert.match(options.calls[0].text, /budget of one lakh rupees and a target of six weeks/);
+  assert.match(options.calls[0].text, /Live preview: https:\/\/preview\.example\.test/);
+  assert.doesNotMatch(options.calls[0].text, /Lead status|Hot|Warm|Cold/);
   assert.deepEqual(
     options.calls[0].attachments.map(({ kind }) => kind),
     ["image"]
@@ -708,13 +711,12 @@ test("stores a valid on-end event and sends the assignment package exactly once"
   assert.equal(options.callbackStore.transitions.length, 0);
   assert.equal(options.calls.length, 1);
   assert.equal(options.calls[0].to, "918639885985");
-  assert.match(options.calls[0].text, /Business: handmade clothing/);
-  assert.match(options.calls[0].text, /Products: about 80/);
-  assert.match(options.calls[0].text, /Budget: around 60000 rupees/);
-  assert.match(options.calls[0].text, /Timeline: next month/);
+  assert.match(options.calls[0].text, /online store for handmade clothing with about 80/);
+  assert.match(options.calls[0].text, /budget of around 60000 rupees and a target of next month/);
   assert.match(options.calls[0].text, /catalog, UPI payments and WhatsApp support/);
   assert.match(options.calls[0].text, /launch before the festival season/);
-  assert.match(options.calls[0].text, /Lead status: Warm/);
+  assert.match(options.calls[0].text, /Live preview: https:\/\/preview\.example\.test/);
+  assert.doesNotMatch(options.calls[0].text, /Lead status|Hot|Warm|Cold/);
   assert.deepEqual(
     options.calls[0].attachments.map(({ kind }) => kind),
     ["image"]
@@ -738,8 +740,12 @@ test("uses recent user speech when the agent did not produce a follow-up summary
     assert.equal(response.status, 200);
   });
   assert.equal(options.calls.length, 1);
-  assert.match(options.calls[0].text, /Context: I am only comparing options this month/);
-  assert.match(options.calls[0].text, /Lead status: Cold/);
+  assert.match(options.calls[0].text, /From our conversation: I am only comparing options this month\./);
+  assert.equal(
+    options.calls[0].text.match(/I am only comparing options this month/g)?.length,
+    1
+  );
+  assert.doesNotMatch(options.calls[0].text, /Lead status|Hot|Warm|Cold/);
 });
 
 test("does not send a post-call package when the call did not connect", async () => {

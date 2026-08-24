@@ -47,6 +47,21 @@ test("rejects unknown request fields", () => {
   );
 });
 
+test("rejects placeholder values before they can reach WhatsApp", () => {
+  assert.throws(
+    () => parseMessageRequest({ ...validMidCall, budget: "[budget from call]" }),
+    /placeholder/i
+  );
+  assert.throws(
+    () => parseMessageRequest({ ...validMidCall, features: "<features discussed>" }),
+    /placeholder/i
+  );
+  assert.throws(
+    () => parseMessageRequest({ ...validMidCall, summary: "Budget is [pending]" }),
+    /placeholder/i
+  );
+});
+
 test("rejects a non-Hot mid-call request", () => {
   assert.throws(
     () => parseMessageRequest({ ...validMidCall, classification: "Warm" }),
@@ -54,23 +69,24 @@ test("rejects a non-Hot mid-call request", () => {
   );
 });
 
-test("formats captured facts and always includes Srikar's contact number", () => {
+test("formats captured facts as natural prose and includes Srikar's contact number", () => {
   const request = parseMessageRequest({
     request_id: "call-456:mid-call",
     to: "918688664337",
     stage: "mid_call",
     classification: "Hot",
     business: "books",
-    budget: "not discussed",
+    budget: "around 60000 rupees",
   });
 
   const result = formatMessage(request, {
     architectureImagePath: "/private/architecture.png",
   });
 
-  assert.match(result.text, /Business: books/);
-  assert.match(result.text, /Budget: not discussed/);
+  assert.match(result.text, /planning an online store for books/);
+  assert.match(result.text, /budget of around 60000 rupees/);
   assert.doesNotMatch(result.text, /Timeline:/);
+  assert.doesNotMatch(result.text, /Lead status|Hot|Warm|Cold/);
   assert.match(result.text, /WhatsApp or text Srikar at \+918639885985/);
   assert.deepEqual(result.attachments, []);
 });
@@ -86,7 +102,7 @@ test("uses the caller language and quotes their exact words", () => {
 
   assert.match(result.text, /మీతో మాట్లాడినందుకు ధన్యవాదాలు/);
   assert.match(result.text, /మీరు చెప్పింది: “పండుగకు ముందు launch చేయాలి”/);
-  assert.match(result.text, /లీడ్ స్థితి: Hot/);
+  assert.doesNotMatch(result.text, /లీడ్ స్థితి|Hot|Warm|Cold/);
   assert.match(result.text, /\+918639885985/);
 });
 
@@ -101,15 +117,18 @@ test("adds the Mermaid architecture and repository without attaching a resume", 
 
   const result = formatMessage(request, {
     architectureImagePath: "/private/architecture.png",
+    previewUrl: "https://preview.example.test",
     repositoryUrl: "https://github.com/Srikarsmile/elevate-whatsapp-bridge",
     implementationNote:
       "The live Sarvam agent qualifies the lead while Hermes handles WhatsApp and callback actions. The linked WhatsApp transport is experimental; Meta Cloud API is the production replacement.",
   });
 
-  assert.match(result.text, /Thanks for speaking with our website specialist/);
+  assert.match(result.text, /Thanks for speaking with me about your e-commerce website/);
   assert.doesNotMatch(result.text, /Priya/);
-  assert.match(result.text, /Lead status: Warm/);
-  assert.match(result.text, /live Sarvam agent qualifies the lead/);
+  assert.doesNotMatch(result.text, /Lead status|Hot|Warm|Cold/);
+  assert.match(result.text, /From our conversation: Interested after a partner discussion\./);
+  assert.match(result.text, /Live preview: https:\/\/preview\.example\.test/);
+  assert.match(result.text, /Build note: The live Sarvam agent qualifies the lead/);
   assert.match(
     result.text,
     /https:\/\/github\.com\/Srikarsmile\/elevate-whatsapp-bridge/
@@ -122,6 +141,7 @@ test("adds the Mermaid architecture and repository without attaching a resume", 
       mimetype: "image/png",
     },
   ]);
+  assert.doesNotMatch(result.text, /\[[^\]]+\]|<[^>]+>/);
 });
 
 test("rejects a post-call follow-up without the architecture artifact", () => {

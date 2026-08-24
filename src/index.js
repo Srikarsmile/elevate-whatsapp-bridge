@@ -120,6 +120,7 @@ const server = createBridgeServer({
   }),
   architectureImagePath:
     process.env.ARCHITECTURE_IMAGE_PATH || `${stateDir}/assets/architecture.png`,
+  previewUrl: process.env.PREVIEW_URL || null,
   repositoryUrl: process.env.REPOSITORY_URL,
   implementationNote: process.env.IMPLEMENTATION_NOTE,
   logger,

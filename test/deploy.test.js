@@ -104,6 +104,11 @@ test("worker environment example names settings without containing secrets", asy
   assert.doesNotMatch(example, /sk-|Bearer |[a-f0-9]{32,}/i);
 });
 
+test("bridge environment example carries the optional live preview URL", async () => {
+  const example = await read("deploy/elevate-whatsapp-bridge.env.example");
+  assert.match(example, /^PREVIEW_URL=https:\/\/example\.com\/generated-preview$/m);
+});
+
 test("runbook documents no-call gates, feedback approval, and neutral agent wording", async () => {
   const runbook = await read("docs/demo-runbook.md");
   assert.match(runbook, /918639885985/);
