@@ -604,7 +604,7 @@ test("accepts a correlated Sarvam outbound event and persists it before callback
   assert.match(options.calls[0].text, /Lead status: Warm/);
   assert.deepEqual(
     options.calls[0].attachments.map(({ kind }) => kind),
-    ["image", "document"]
+    ["image"]
   );
   const event = options.callEventStore.list()[0];
   assert.equal(event.phone_last4, "4337");
@@ -717,7 +717,7 @@ test("stores a valid on-end event and sends the assignment package exactly once"
   assert.match(options.calls[0].text, /Lead status: Warm/);
   assert.deepEqual(
     options.calls[0].attachments.map(({ kind }) => kind),
-    ["image", "document"]
+    ["image"]
   );
 });
 

@@ -15,7 +15,7 @@
 3. A callback is created only after the caller gives a specific future time and confirms it.
 4. The callback scheduler claims the booking once and persists the claim before dispatch.
 5. Sarvam's outcome webhook supplies authoritative call status and transcript data.
-6. Hot leads receive the contextual mid-call WhatsApp follow-up. Every connected outbound result triggers one idempotent post-call package with actual context, Srikar's number, the architecture image, resume, repository link, and implementation note. The optional on-end hook is supported as a duplicate-safe fallback.
+6. Hot leads receive the contextual mid-call WhatsApp follow-up. Every connected outbound result triggers one idempotent post-call package with actual context, Srikar's number, the Mermaid-rendered architecture, repository link, and implementation note. The optional on-end hook is supported as a duplicate-safe fallback.
 
 ## Callback states
 
@@ -70,7 +70,7 @@ Raw transcript and event records are retained for 30 days. Evaluation cases keep
 | Hot, Warm, Cold classification | Persisted intent output with post-call evaluation |
 | Mid-call WhatsApp | Authenticated, allowlisted message endpoint |
 | Spoken callback booking | Confirmed time, durable booking ID, and explicit dispatch states |
-| Post-call material | Automatic, idempotent WhatsApp package with call context, architecture, resume, repository, note, and contact number |
+| Post-call material | Automatic, idempotent WhatsApp package with call context, Mermaid-rendered architecture, repository, note, and contact number |
 | Contact number | `+91 86398 85985` in the diagram and approved follow-up content |
 | Continuous improvement | Deterministic checks, tool-free Hermes scoring, regression cases, and human approval |
 

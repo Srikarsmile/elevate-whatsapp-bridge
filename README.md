@@ -7,7 +7,7 @@ This is the action layer for Srikar Reddy's ElevateBox SDE Intern assignment. Sa
 - Two-number allowlist: assignment reviewer and controlled test number
 - Idempotent mid-call and automatic post-call WhatsApp delivery
 - Sarvam-specific action routes with server-generated idempotency keys
-- Post-call context, mobile number, architecture image, resume, repository, and note
+- Post-call context, mobile number, Mermaid-rendered architecture, repository, and note
 - Confirmed callback booking with durable state and live Sarvam dispatch
 - Hot, Warm, and Cold intent evidence from structured agent variables
 - Deterministic evaluation plus isolated, tool-free Hermes scoring
@@ -40,6 +40,6 @@ credentials, and returns the live preview URL to the WhatsApp workflow.
 
 ## Implementation note
 
-What works: Sarvam calls, listens across Telugu, Hindi and English, qualifies the lead, and triggers authenticated Hermes actions during the conversation. Hot intent sends contextual WhatsApp before hang-up; confirmed callback times are stored durably; the final follow-up carries actual call context, my number, the architecture image, resume, and repository. Current limitation: WhatsApp uses a linked personal session for this experiment, so reconnection may occasionally be required. Next: replace that transport with Meta Cloud API and connect callbacks to production CRM and campaign orchestration.
+What works: Sarvam calls, listens across Telugu, Hindi and English, qualifies the lead, and triggers authenticated Hermes actions during the conversation. Hot intent sends contextual WhatsApp before hang-up; confirmed callback times are stored durably; the final follow-up carries actual call context, my number, the Mermaid-rendered architecture, and repository. Current limitation: WhatsApp uses a linked personal session for this experiment, so reconnection may occasionally be required. Next: replace that transport with Meta Cloud API and connect callbacks to production CRM and campaign orchestration.
 
 Contact: `+91 86398 85985`

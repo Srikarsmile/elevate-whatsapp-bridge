@@ -46,7 +46,8 @@ test("Mermaid architecture documents runtime, preview, and self-improvement gate
   assert.match(diagram, /No Direct Self-Edit/);
   assert.match(diagram, /External Deployment Gate/);
   assert.match(diagram, /WhatsApp/);
-  assert.match(diagram, /resume/);
+  assert.match(diagram, /Mermaid-rendered architecture/);
+  assert.doesNotMatch(diagram, /resume/i);
   assert.match(diagram, /repository/);
   assert.match(diagram, /\+91 86398 85985/);
   assert.doesNotMatch(diagram, /Priya/);
@@ -111,7 +112,8 @@ test("runbook documents no-call gates, feedback approval, and neutral agent word
   assert.match(runbook, /dry_run/);
   assert.match(runbook, /dispatch_unknown/);
   assert.match(runbook, /human approval/i);
-  assert.match(runbook, /resume/i);
+  assert.match(runbook, /Mermaid-rendered architecture/i);
+  assert.doesNotMatch(runbook, /resume/i);
   assert.match(runbook, /repository/i);
   assert.match(runbook, /30 days/);
   assert.doesNotMatch(runbook, /Priya/);

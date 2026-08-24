@@ -120,8 +120,6 @@ const server = createBridgeServer({
   }),
   architectureImagePath:
     process.env.ARCHITECTURE_IMAGE_PATH || `${stateDir}/assets/architecture.png`,
-  resumePath:
-    process.env.RESUME_PATH || `${stateDir}/assets/Srikar-Reddy-Software-Engineer-CV.pdf`,
   repositoryUrl: process.env.REPOSITORY_URL,
   implementationNote: process.env.IMPLEMENTATION_NOTE,
   logger,

@@ -5,7 +5,7 @@ flowchart LR
     lead(["Lead / reviewer"])
     voice["Sarvam Voice Agent<br/>Telugu / Hindi / English<br/>interruptions + intent"]
     bridge["Authenticated Hermes Bridge<br/>consent + allowlist + idempotency"]
-    whatsapp["WhatsApp<br/>mid-call on high intent<br/>post-call: context + resume + number<br/>repository + architecture"]
+    whatsapp["WhatsApp<br/>mid-call on high intent<br/>post-call: context + number<br/>repository + Mermaid-rendered architecture"]
     booking["Durable Callback Store<br/>confirmed time + caller context"]
     scheduler["Callback Scheduler<br/>claim first; quarantine unknowns"]
     dispatchGate{"Live Dispatch Gate<br/>disabled -> dry_run -> live"}
