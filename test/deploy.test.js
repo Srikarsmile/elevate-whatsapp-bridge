@@ -31,13 +31,18 @@ test("nginx route keeps the bridge local, bounded and rate limited", async () =>
 
 test("Mermaid architecture documents runtime, preview, and self-improvement gates", async () => {
   const diagram = await read("assets/architecture.mmd");
-  assert.match(diagram, /^flowchart LR/m);
+  assert.match(diagram, /^flowchart TB/m);
   assert.match(diagram, /Sarvam Voice Agent/);
+  assert.match(diagram, /Hybrid Language Lock/);
+  assert.match(diagram, /Telugu Script Normalization/);
+  assert.match(diagram, /Consent \+ Confirmed Brief Gate/);
   assert.match(diagram, /Callback Scheduler/);
   assert.match(diagram, /Instant Outbound/);
   assert.match(diagram, /Website Preview Builder/);
   assert.match(diagram, /Vercel Deployment/);
   assert.match(diagram, /Live Preview URL/);
+  assert.match(diagram, /Preview Delivery Result/);
+  assert.match(diagram, /Language Quality Evaluator/);
   assert.match(diagram, /Deterministic Evaluator/);
   assert.match(diagram, /Tool-free Hermes/);
   assert.match(diagram, /Regression Evidence Gate/);
