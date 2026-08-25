@@ -12,6 +12,18 @@ function failureReason(attempt, status) {
   return value;
 }
 
+function interactionId(attempt) {
+  const value = attempt?.interaction_id?.trim();
+  return value && value !== "NO_INTERACTION_ID" ? value : null;
+}
+
+function attemptIsTerminal(attempt) {
+  if (!attempt) return false;
+  if (attempt.end_datetime) return true;
+  const value = String(attempt.connectivity_status || "").toLowerCase();
+  return ["failed", "no_answer", "no-answer", "not_connected", "busy"].includes(value);
+}
+
 function fallbackEvent({ attempt, payload, transcript }) {
   const status = callStatus(attempt);
   return {
@@ -23,7 +35,7 @@ function fallbackEvent({ attempt, payload, transcript }) {
       agent_phone_number: payload.app_config.connection_config.agent_phone_number,
     },
     duration: attempt.duration_in_seconds ?? null,
-    interaction_id: attempt.interaction_id ?? null,
+    interaction_id: interactionId(attempt),
     failure_reason: failureReason(attempt, status),
     final_agent_variables: attempt.agent_variables || null,
     webhook_config: payload.webhook_config,
@@ -46,7 +58,7 @@ export async function runFirstCall({
   const startDatetime = new Date(startedAt.getTime() - 5 * 60 * 1000).toISOString();
   let attempt = null;
 
-  while (!attempt?.end_datetime) {
+  while (!attemptIsTerminal(attempt)) {
     const current = now();
     if (current.getTime() - startedAt.getTime() >= maxWaitMs) {
       throw new Error("First-call analytics timed out");
@@ -55,17 +67,18 @@ export async function runFirstCall({
       startDatetime,
       endDatetime: new Date(current.getTime() + 5 * 60 * 1000).toISOString(),
     });
-    if (!attempt?.end_datetime) await sleep(pollIntervalMs);
+    if (!attemptIsTerminal(attempt)) await sleep(pollIntervalMs);
   }
 
-  const transcript = attempt.interaction_id
-    ? await analyticsClient.getTranscript(attempt.interaction_id)
+  const completedInteractionId = interactionId(attempt);
+  const transcript = completedInteractionId
+    ? await analyticsClient.getTranscript(completedInteractionId)
     : null;
   const event = fallbackEvent({ attempt, payload, transcript });
   const delivery = await postEvent(payload.webhook_config.url, event);
   return Object.freeze({
     attemptId,
-    interactionId: attempt.interaction_id ?? null,
+    interactionId: completedInteractionId,
     status: event.status,
     duplicate: Boolean(delivery?.duplicate),
   });

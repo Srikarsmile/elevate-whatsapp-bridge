@@ -129,3 +129,49 @@ test("fails closed without replaying when analytics never completes", async () =
   );
   assert.equal(posted, false);
 });
+
+test("completes a terminal carrier failure without an end timestamp", async () => {
+  let transcriptRequested = false;
+  const posted = [];
+
+  const result = await runFirstCall({
+    request,
+    outboundClient: {
+      createFirstCall: async () => ({ attemptId: "attempt-failed", payload }),
+    },
+    analyticsClient: {
+      getAttempt: async () => ({
+        attempt_id: "attempt-failed",
+        interaction_id: "NO_INTERACTION_ID",
+        connectivity_status: "failed",
+        failure_reason: "NO_FAILURE_REASON",
+        duration_in_seconds: 0,
+        end_datetime: null,
+        channel_provider: null,
+      }),
+      getTranscript: async () => {
+        transcriptRequested = true;
+        return [];
+      },
+    },
+    postEvent: async (url, event) => {
+      posted.push({ url, event });
+      return { ok: true, duplicate: true };
+    },
+    sleep: async () => {
+      throw new Error("terminal failures must not poll again");
+    },
+    now: () => new Date("2026-08-25T08:01:59.000Z"),
+  });
+
+  assert.equal(transcriptRequested, false);
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].event.status, "failed");
+  assert.equal(posted[0].event.interaction_id, null);
+  assert.deepEqual(result, {
+    attemptId: "attempt-failed",
+    interactionId: null,
+    status: "failed",
+    duplicate: true,
+  });
+});
