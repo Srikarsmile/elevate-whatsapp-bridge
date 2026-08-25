@@ -69,6 +69,32 @@ test("rejects a non-Hot mid-call request", () => {
   );
 });
 
+test("formats a truthful outreach package when the call did not connect", () => {
+  const request = parseMessageRequest({
+    request_id: "assignment-outreach-20260825",
+    to: "918688664337",
+    stage: "outreach",
+    classification: "Cold",
+    summary:
+      "The prototype handles multilingual discovery, intent classification, WhatsApp actions, callbacks, and tailored website previews deployed to Vercel",
+    language: "English",
+  });
+
+  const result = formatMessage(request, {
+    architectureImagePath: "/private/architecture.png",
+    previewUrl: "https://preview.example.test",
+    repositoryUrl: "https://github.com/example/prototype",
+    implementationNote: "The call provider failed before connection; the system remains ready.",
+  });
+
+  assert.match(result.text, /tried reaching you by phone, but the call did not connect/i);
+  assert.doesNotMatch(result.text, /Thanks for speaking with me/i);
+  assert.match(result.text, /https:\/\/github.com\/example\/prototype/);
+  assert.match(result.text, /\+918639885985/);
+  assert.equal(result.attachments.length, 1);
+  assert.equal(result.attachments[0].kind, "image");
+});
+
 test("formats captured facts as natural prose and includes Srikar's contact number", () => {
   const request = parseMessageRequest({
     request_id: "call-456:mid-call",

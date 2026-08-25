@@ -34,7 +34,7 @@ const messageRequestSchema = z
   .object({
     request_id: z.string().trim().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/),
     to: approvedRecipient,
-    stage: z.enum(["mid_call", "post_call"]),
+    stage: z.enum(["mid_call", "post_call", "outreach"]),
     classification: z.enum(["Hot", "Warm", "Cold"]),
     business: bounded.optional(),
     products: bounded.optional(),
@@ -177,6 +177,8 @@ export function formatMessage(
     english: {
       midCall: "Thanks for speaking with me. Here is a quick recap of our conversation:",
       postCall: "Thanks for speaking with me about your e-commerce website.",
+      outreach:
+        "Hi ElevateBox team. I tried reaching you by phone, but the call did not connect. I'm sharing the working prototype details here.",
       preview: "Live preview",
       repository: "Source code",
       contact: "WhatsApp or text Srikar at",
@@ -188,6 +190,8 @@ export function formatMessage(
       midCall: "మీతో మాట్లాడినందుకు ధన్యవాదాలు. మన సంభాషణలోని ముఖ్యమైన వివరాలు ఇవి:",
       postCall:
         "మీ ఈ-కామర్స్ వెబ్‌సైట్ గురించి మాతో మాట్లాడినందుకు ధన్యవాదాలు. నేను అర్థం చేసుకున్నది ఇది:",
+      outreach:
+        "నమస్కారం ElevateBox బృందం. ఫోన్‌లో సంప్రదించడానికి ప్రయత్నించాను, కానీ కాల్ కనెక్ట్ కాలేదు. పనిచేస్తున్న నమూనా వివరాలు ఇక్కడ పంపుతున్నాను.",
       preview: "లైవ్ ప్రివ్యూ",
       repository: "సోర్స్ కోడ్",
       contact: "Srikarకి WhatsApp లేదా టెక్స్ట్ చేయండి",
@@ -199,6 +203,8 @@ export function formatMessage(
       midCall: "हमसे बात करने के लिए धन्यवाद। हमारी बातचीत के मुख्य विवरण ये हैं:",
       postCall:
         "अपनी ई-कॉमर्स वेबसाइट के बारे में हमसे बात करने के लिए धन्यवाद। मैंने यह समझा:",
+      outreach:
+        "नमस्ते ElevateBox टीम। मैंने फ़ोन पर संपर्क करने की कोशिश की, लेकिन कॉल कनेक्ट नहीं हुई। मैं काम कर रहे प्रोटोटाइप का विवरण यहाँ भेज रहा हूँ।",
       preview: "लाइव प्रीव्यू",
       repository: "सोर्स कोड",
       contact: "Srikar को WhatsApp या टेक्स्ट करें",
@@ -208,13 +214,18 @@ export function formatMessage(
     },
   }[language];
 
-  const opening = request.stage === "mid_call" ? copy.midCall : copy.postCall;
+  const opening =
+    request.stage === "mid_call"
+      ? copy.midCall
+      : request.stage === "outreach"
+        ? copy.outreach
+        : copy.postCall;
   const sections = [opening];
   const context = naturalContext(request, language);
   if (context.length > 0) sections.push(context.join(" "));
 
   const attachments = [];
-  if (request.stage === "post_call") {
+  if (request.stage === "post_call" || request.stage === "outreach") {
     if (!architectureImagePath) throw new Error("Post-call architecture image is required");
     const repository = repositoryUrl?.trim();
     if (!repository) throw new Error("Post-call repository URL is required");
