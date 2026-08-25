@@ -6,6 +6,7 @@ import { parseCallbackRequest } from "./callback.js";
 import { EvaluationQueueError } from "./evaluation-queue.js";
 import { FeedbackLoopError } from "./feedback-loop.js";
 import { formatMessage, parseMessageRequest } from "./message.js";
+import { recipientForAlias } from "./phone-policy.js";
 import { buildPostCallMessageRequest } from "./post-call-message.js";
 
 const DEFAULT_BODY_LIMIT = 32 * 1024;
@@ -330,17 +331,23 @@ export function createBridgeServer({
       let event;
       let bookingId = null;
       let booking = null;
+      let outboundRecipient = null;
       try {
         if (sarvamWebhook.kind === "outbound-events") {
           bookingId = body?.webhook_config?.metadata?.booking_id;
           booking = typeof bookingId === "string" ? callbackStore.get(bookingId) : null;
-          if (!booking) {
+          const recipientAlias = body?.webhook_config?.metadata?.recipient_alias;
+          if (booking) {
+            outboundRecipient = booking.to;
+          } else if (typeof recipientAlias === "string") {
+            outboundRecipient = recipientForAlias(recipientAlias);
+          } else {
             sendJson(response, 404, { ok: false, error: "Callback booking not found" });
             return;
           }
           event = parseOutboundEvent(body, {
             phoneHashSalt,
-            recipientPhone: booking.to,
+            recipientPhone: outboundRecipient,
           });
         } else {
           event = parseOnEndEvent(body, { phoneHashSalt });
@@ -377,7 +384,7 @@ export function createBridgeServer({
           postCallRequest = buildPostCallMessageRequest({
             event,
             recipientPhone:
-              sarvamWebhook.kind === "on-end" ? body.user_phone_number : booking.to,
+              sarvamWebhook.kind === "on-end" ? body.user_phone_number : outboundRecipient,
           });
           await deliverMessage(postCallRequest);
         } catch {

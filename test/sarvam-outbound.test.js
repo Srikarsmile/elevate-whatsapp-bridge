@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   SarvamOutboundError,
+  buildFirstCallPayload,
   buildOutboundPayload,
   createSarvamOutboundClient,
 } from "../src/sarvam-outbound.js";
@@ -76,6 +77,66 @@ test("carries the prior conversation into the callback agent session", () => {
     prior_call_context: "Requested a five-minute callback",
     requested_callback_time: "in five minutes",
   });
+});
+
+test("builds a fresh controlled call with mandatory webhook correlation", () => {
+  assert.deepEqual(
+    buildFirstCallPayload(
+      {
+        recipient_alias: "controlled_test",
+        prospect_name: "Srikar",
+        request_id: "controlled-test:20260825:v20",
+      },
+      config
+    ),
+    {
+      app_config: {
+        app_id: "app-test",
+        app_version: 7,
+        connection_config: {
+          connection_id: "connection-test",
+          agent_phone_number: "+918071581315",
+        },
+        agent_variables: {
+          prospect_name: "Srikar",
+          recipient_number: "+918639885985",
+          user_name: "Srikar",
+          initial_call_type: "first_call",
+          prior_call_context: "",
+          requested_callback_time: "",
+        },
+      },
+      user_config: { user_phone_number: "+918639885985" },
+      webhook_config: {
+        url: "https://example.test/elevate-whatsapp/v1/sarvam/outbound-events/webhook-token-with-32-characters",
+        metadata: {
+          recipient_alias: "controlled_test",
+          request_id: "controlled-test:20260825:v20",
+        },
+      },
+    }
+  );
+});
+
+test("sends a fresh call through the same authenticated client", async () => {
+  const calls = [];
+  const request = {
+    recipient_alias: "controlled_test",
+    prospect_name: "Srikar",
+    request_id: "controlled-test:20260825:v20",
+  };
+  const client = createSarvamOutboundClient({
+    config,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return response(200, { attempt_id: "attempt-first-1" });
+    },
+  });
+
+  const result = await client.createFirstCall(request);
+
+  assert.equal(result.attemptId, "attempt-first-1");
+  assert.deepEqual(JSON.parse(calls[0].options.body), buildFirstCallPayload(request, config));
 });
 
 test("sends one authenticated request and returns the attempt ID", async () => {

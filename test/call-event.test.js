@@ -96,6 +96,28 @@ test("accepts a non-connected event and marks its transcript unavailable", () =>
   assert.equal(event.transcript, null);
 });
 
+test("accepts a bounded recipient alias for a first-call webhook", () => {
+  const event = parseOutboundEvent(
+    {
+      ...outbound,
+      webhook_config: {
+        ...outbound.webhook_config,
+        metadata: {
+          recipient_alias: "controlled_test",
+          request_id: "controlled-test:20260825",
+        },
+      },
+    },
+    { phoneHashSalt, receivedAt, recipientPhone: "918639885985" }
+  );
+
+  assert.deepEqual(event.correlation, {
+    recipient_alias: "controlled_test",
+    request_id: "controlled-test:20260825",
+  });
+  assert.doesNotMatch(JSON.stringify(event), /918639885985/);
+});
+
 test("marks a connected event without a transcript for asynchronous backfill", () => {
   const event = parseOutboundEvent(
     { ...outbound, interaction_transcript: null },

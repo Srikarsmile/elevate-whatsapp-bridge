@@ -7,6 +7,10 @@ export const ALLOWED_RECIPIENTS = Object.freeze([
   CONTROLLED_TEST_RECIPIENT,
 ]);
 export const SRIKAR_CONTACT = "+918639885985";
+const RECIPIENT_ALIASES = Object.freeze({
+  assignment: ASSIGNMENT_RECIPIENT,
+  controlled_test: CONTROLLED_TEST_RECIPIENT,
+});
 
 export function normalizeIndianPhone(value) {
   if (typeof value !== "string") throw new Error("Invalid Indian mobile number");
@@ -25,6 +29,13 @@ export function assertAllowedRecipient(value) {
     throw new Error("Recipient is not in the demo allowlist");
   }
   return normalized;
+}
+
+export function recipientForAlias(value) {
+  if (typeof value !== "string" || !Object.hasOwn(RECIPIENT_ALIASES, value)) {
+    throw new Error("Invalid demo recipient alias");
+  }
+  return RECIPIENT_ALIASES[value];
 }
 
 export function redactPhone(value) {

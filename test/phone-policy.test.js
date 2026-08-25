@@ -6,6 +6,7 @@ import {
   assertAllowedRecipient,
   hashPhone,
   normalizeIndianPhone,
+  recipientForAlias,
   redactPhone,
 } from "../src/phone-policy.js";
 
@@ -26,6 +27,12 @@ test("allows exactly the two approved demo recipients", () => {
   assert.deepEqual(ALLOWED_RECIPIENTS, ["918688664337", "918639885985"]);
   assert.equal(assertAllowedRecipient("+91-86886-64337"), "918688664337");
   assert.throws(() => assertAllowedRecipient("+91 99999 99999"), /allowlist/);
+});
+
+test("maps only explicit demo aliases to allowlisted recipients", () => {
+  assert.equal(recipientForAlias("controlled_test"), "918639885985");
+  assert.equal(recipientForAlias("assignment"), "918688664337");
+  assert.throws(() => recipientForAlias("unknown"), /alias/);
 });
 
 test("redacts all but the last four digits", () => {

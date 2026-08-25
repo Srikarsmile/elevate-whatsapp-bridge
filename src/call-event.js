@@ -17,6 +17,7 @@ const variablesSchema = z.record(z.string().trim().min(1).max(160), z.unknown())
 const correlationSchema = z
   .object({
     booking_id: z.string().regex(/^cb-[a-f0-9]{16}$/).optional(),
+    recipient_alias: z.enum(["assignment", "controlled_test"]).optional(),
     request_id: z.string().trim().min(8).max(160).optional(),
   })
   .strict()

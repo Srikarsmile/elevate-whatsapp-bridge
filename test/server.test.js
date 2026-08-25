@@ -614,6 +614,39 @@ test("accepts a correlated Sarvam outbound event and persists it before callback
   assert.doesNotMatch(JSON.stringify(event), /918688664337|test-webhook-token/);
 });
 
+test("accepts an allowlisted first-call alias and sends the post-call package", async () => {
+  const options = baseOptions();
+  const event = outboundEvent("cb-1111111111111111", {
+    webhook_config: {
+      url: `https://example.test/v1/sarvam/outbound-events/${webhookToken}`,
+      metadata: {
+        recipient_alias: "controlled_test",
+        request_id: "controlled-test:20260825:v20",
+      },
+    },
+    final_agent_variables: {
+      intent_level: "Cold",
+      follow_up_summary: "No current business; exploring whether a future idea needs a site.",
+    },
+  });
+
+  await withServer(options, async (baseUrl) => {
+    const response = await postWebhook(baseUrl, "outbound-events", event);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, duplicate: false });
+  });
+
+  assert.equal(options.callbackStore.transitions.length, 0);
+  assert.equal(options.calls.length, 1);
+  assert.equal(options.calls[0].to, "918639885985");
+  assert.match(options.calls[0].text, /No current business/);
+  assert.deepEqual(options.calls[0].attachments.map(({ kind }) => kind), ["image"]);
+  assert.doesNotMatch(
+    JSON.stringify(options.callEventStore.list()[0]),
+    /918639885985|test-webhook-token/
+  );
+});
+
 test("maps Sarvam non-connected outcomes onto callback state", async () => {
   for (const status of ["no_answer", "busy", "failed"]) {
     const options = baseOptions();
