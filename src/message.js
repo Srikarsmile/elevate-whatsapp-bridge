@@ -221,7 +221,10 @@ export function formatMessage(
         ? copy.outreach
         : copy.postCall;
   const sections = [opening];
-  const context = naturalContext(request, language);
+  const context =
+    request.stage === "outreach" && request.summary
+      ? [withPeriod(request.summary)]
+      : naturalContext(request, language);
   if (context.length > 0) sections.push(context.join(" "));
 
   const attachments = [];

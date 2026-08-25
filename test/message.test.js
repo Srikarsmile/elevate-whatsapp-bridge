@@ -89,6 +89,7 @@ test("formats a truthful outreach package when the call did not connect", () => 
 
   assert.match(result.text, /tried reaching you by phone, but the call did not connect/i);
   assert.doesNotMatch(result.text, /Thanks for speaking with me/i);
+  assert.doesNotMatch(result.text, /From our conversation/i);
   assert.match(result.text, /https:\/\/github.com\/example\/prototype/);
   assert.match(result.text, /\+918639885985/);
   assert.equal(result.attachments.length, 1);
