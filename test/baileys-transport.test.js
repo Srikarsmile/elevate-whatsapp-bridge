@@ -9,6 +9,10 @@ function createHarness(overrides = {}) {
   const logs = [];
   const qrWrites = [];
   const deleted = [];
+  const signalLogs = [];
+  const signalConsole = {
+    info: (...entries) => signalLogs.push(entries),
+  };
   let reconnect;
   const socket = {
     ev: {
@@ -42,6 +46,7 @@ function createHarness(overrides = {}) {
       info: (entry) => logs.push(entry),
       error: (entry) => logs.push(entry),
     },
+    signalConsole,
     ...overrides,
   });
   return {
@@ -51,9 +56,20 @@ function createHarness(overrides = {}) {
     logs,
     qrWrites,
     deleted,
+    signalConsole,
+    signalLogs,
     triggerReconnect: () => reconnect?.(),
   };
 }
+
+test("suppresses libsignal session dumps while preserving normal console info", () => {
+  const harness = createHarness();
+
+  harness.signalConsole.info("Closing session:", { privateKey: "secret-key-material" });
+  harness.signalConsole.info("safe status", { connected: true });
+
+  assert.deepEqual(harness.signalLogs, [["safe status", { connected: true }]]);
+});
 
 test("writes a private QR image without logging QR contents", async () => {
   const harness = createHarness();

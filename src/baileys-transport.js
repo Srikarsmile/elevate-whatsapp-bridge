@@ -12,6 +12,18 @@ import QRCode from "qrcode";
 import { ALLOWED_RECIPIENTS } from "./message.js";
 
 const allowedRecipients = new Set(ALLOWED_RECIPIENTS);
+const guardedSignalConsoles = new WeakSet();
+
+function suppressSignalSessionDumps(consoleObject) {
+  if (!consoleObject || guardedSignalConsoles.has(consoleObject)) return;
+  const originalInfo = consoleObject.info?.bind(consoleObject);
+  if (!originalInfo) return;
+  consoleObject.info = (...entries) => {
+    if (entries[0] === "Closing session:") return;
+    originalInfo(...entries);
+  };
+  guardedSignalConsoles.add(consoleObject);
+}
 
 async function writePrivateQr(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
@@ -43,7 +55,9 @@ export function createBaileysTransport({
   removeFile = removeIfPresent,
   scheduleReconnect = (callback) => setTimeout(callback, 3000),
   cancelReconnect = (timer) => clearTimeout(timer),
+  signalConsole = console,
 }) {
+  suppressSignalSessionDumps(signalConsole);
   let connectionState = "disconnected";
   let socket = null;
   let reconnectTimer = null;
