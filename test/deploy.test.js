@@ -38,6 +38,8 @@ test("Mermaid architecture documents runtime, preview, and self-improvement gate
   assert.match(diagram, /Consent \+ Confirmed Brief Gate/);
   assert.match(diagram, /Callback Scheduler/);
   assert.match(diagram, /Instant Outbound/);
+  assert.match(diagram, /Analytics Reconciliation Fallback/);
+  assert.match(diagram, /same deduplicated event/);
   assert.match(diagram, /Website Preview Builder/);
   assert.match(diagram, /Vercel Deployment/);
   assert.match(diagram, /Live Preview URL/);

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node --check src/*.js && node --check bin/*.js && python3 -m py_compile worker/hermes_eval.py",
+    "first-call": "node bin/first-call.js",
     "recommendations": "node bin/recommendations.js",
     "start": "node src/index.js",
     "test": "node --test",

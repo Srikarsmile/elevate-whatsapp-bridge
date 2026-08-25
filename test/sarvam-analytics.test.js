@@ -52,6 +52,75 @@ test("fetches and validates a transcript with the Sarvam API key", async () => {
   assert.ok(calls[0].options.signal);
 });
 
+test("fetches one redacted attempt by its exact ID", async () => {
+  const calls = [];
+  const client = createSarvamAnalyticsClient({
+    config,
+    baseUrl: "https://sarvam.test/api/analytics/v1",
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return response(200, {
+        items: [
+          {
+            attempt_id: "attempt-123",
+            interaction_id: "20260825/interaction-123",
+            connectivity_status: "connected",
+            failure_reason: "NO_FAILURE_REASON",
+            ended_by: "AGENT_ENDS",
+            duration_in_seconds: 34.8,
+            start_datetime: "2026-08-25T07:18:10",
+            end_datetime: "2026-08-25T07:18:45",
+            channel_provider: "vobiz",
+            agent_variables: { intent_level: "Cold" },
+            user_contact_masked: "******5985",
+          },
+        ],
+        total: 1,
+        limit: 20,
+        offset: 0,
+      });
+    },
+  });
+
+  const attempt = await client.getAttempt("attempt-123", {
+    startDatetime: "2026-08-25T07:00:00.000Z",
+    endDatetime: "2026-08-25T08:00:00.000Z",
+  });
+
+  assert.deepEqual(attempt, {
+    attempt_id: "attempt-123",
+    interaction_id: "20260825/interaction-123",
+    connectivity_status: "connected",
+    failure_reason: "NO_FAILURE_REASON",
+    ended_by: "AGENT_ENDS",
+    duration_in_seconds: 34.8,
+    start_datetime: "2026-08-25T07:18:10",
+    end_datetime: "2026-08-25T07:18:45",
+    channel_provider: "vobiz",
+    agent_variables: { intent_level: "Cold" },
+  });
+  const requested = new URL(calls[0].url);
+  assert.equal(requested.searchParams.get("start_datetime"), "2026-08-25T07:00:00.000Z");
+  assert.equal(requested.searchParams.get("end_datetime"), "2026-08-25T08:00:00.000Z");
+  assert.match(requested.searchParams.get("filter_conditions"), /attempt-123/);
+  assert.doesNotMatch(JSON.stringify(attempt), /5985/);
+});
+
+test("returns null when the exact attempt is not present", async () => {
+  const client = createSarvamAnalyticsClient({
+    config,
+    fetchImpl: async () =>
+      response(200, { items: [], total: 0, limit: 20, offset: 0 }),
+  });
+  assert.equal(
+    await client.getAttempt("attempt-123", {
+      startDatetime: "2026-08-25T07:00:00.000Z",
+      endDatetime: "2026-08-25T08:00:00.000Z",
+    }),
+    null
+  );
+});
+
 test("accepts a direct transcript array response", async () => {
   const client = createSarvamAnalyticsClient({
     config,

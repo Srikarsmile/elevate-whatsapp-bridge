@@ -3,7 +3,7 @@ flowchart TB
   subgraph runtime["1 - LIVE CALL  |"]
     direction LR
     lead(["Lead / reviewer"])
-    voice["Sarvam Voice Agent<br/>v19 hybrid Telugu / Hindi / English<br/>interruptions + intent"]
+    voice["Sarvam Voice Agent<br/>v20 hybrid Telugu / Hindi / English<br/>named permission opening + intent"]
     languageLock["Hybrid Language Lock<br/>first meaningful sentence<br/>state preserved across switches"]
     teluguPolicy["Telugu Script Normalization<br/>native grammar + one-question turns<br/>technical terms in Telugu script"]
     bridge["Authenticated Hermes Bridge<br/>consent + allowlist + idempotency"]
@@ -14,6 +14,7 @@ flowchart TB
     outbound["Sarvam Instant Outbound<br/>one idempotent call request"]
     hold["Hold / dry run<br/>no call"]
     webhook["Signed Outcome Webhook<br/>provider truth"]
+    reconciler["Analytics Reconciliation Fallback<br/>poll attempt + fetch transcript<br/>replay through same dedupe path"]
 
     lead <-->|"natural conversation"| voice
     languageLock --> teluguPolicy --> voice
@@ -25,6 +26,9 @@ flowchart TB
     dispatchGate -->|"default"| hold
     voice -. "call outcome" .-> webhook
     outbound -. "callback outcome" .-> webhook
+    outbound -. "webhook absent" .-> reconciler
+    webhook -->|"verified completion"| bridge
+    reconciler -->|"same deduplicated event"| bridge
   end
 
   subgraph preview["2 - BUILD + VERCEL  |"]
@@ -100,7 +104,7 @@ flowchart TB
 
   class voice,languageLock,teluguPolicy,outbound voice;
   class bridge,whatsapp,scheduler action;
-  class booking,webhook,queue,handoff,eventStore,cases,backlog data;
+  class booking,webhook,reconciler,queue,handoff,eventStore,cases,backlog data;
   class builder,browserGates,finalReview,evaluator,languageEvaluator,hermes,recommendation evaluate;
   class dispatchGate,consentBriefGate,previewApproval,deliveryGate,evidenceGate,humanGate,promotionGate gate;
   class protected protected;
